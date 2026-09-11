@@ -14,14 +14,16 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: "http://localhost:3000",
+    origin: true,
     credentials: true,
   });
 
-  await app.listen(3001);
+  const port = Number(process.env.PORT) || 3001;
+
+  await app.listen(port, "0.0.0.0");
 
   console.log(
-    "API running on http://localhost:3001",
+    `API running on http://0.0.0.0:${port}`,
   );
 }
 
