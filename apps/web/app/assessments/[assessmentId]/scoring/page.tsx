@@ -84,8 +84,7 @@ export default function ScoringRulesPage() {
       DEFAULT_RULES,
     );
 
-  const [saved, setSaved] =
-    useState(false);
+  
 
   const [errors, setErrors] =
     useState<string[]>([]);
@@ -97,63 +96,121 @@ export default function ScoringRulesPage() {
   */
 
   useEffect(() => {
-    const assessmentRaw =
-      sessionStorage.getItem(
-        "assessmentDraft",
-      );
 
-    if (assessmentRaw) {
+    async function loadData() {
+
       try {
-        setAssessment(
-          JSON.parse(
-            assessmentRaw,
-          ),
-        );
-      } catch {
-        console.error(
-          "Unable to load assessment.",
-        );
-      }
-    }
 
-    const questionRaw =
-      sessionStorage.getItem(
-        `assessmentQuestions:${assessmentId}`,
-      );
+        const assessmentResponse =
+          await fetch(
+            `http://localhost:3001/assessment/${assessmentId}`
+          );
 
-    if (questionRaw) {
-      try {
-        setQuestions(
-          JSON.parse(
-            questionRaw,
-          ),
-        );
-      } catch {
-        console.error(
-          "Unable to load assessment questions.",
-        );
-      }
-    }
 
-    const scoringRaw =
-      sessionStorage.getItem(
-        `assessmentScoring:${assessmentId}`,
-      );
+        if (!assessmentResponse.ok) {
+          throw new Error("Assessment not found");
+        }
 
-    if (scoringRaw) {
-      try {
-        setRules({
-          ...DEFAULT_RULES,
-          ...JSON.parse(
-            scoringRaw,
-          ),
+
+        const assessmentData =
+          await assessmentResponse.json();
+
+
+        setAssessment({
+
+          id:
+            assessmentData.id,
+
+          title:
+            assessmentData.title,
+
+          code:
+            assessmentData.code,
+
+          totalMarks:
+            assessmentData.totalMarks ?? 0,
+
+          plannedQuestions:
+            assessmentData.plannedQuestions ?? 0,
+
+          durationMinutes:
+            assessmentData.durationMinutes ?? 0,
+
         });
-      } catch {
-        console.error(
-          "Unable to load scoring rules.",
-        );
+
+
+
+
+        const questionResponse =
+          await fetch(
+            `http://localhost:3001/questions/assessment/${assessmentId}`
+          );
+
+
+        if (questionResponse.ok) {
+
+          const questionData =
+            await questionResponse.json();
+
+
+          setQuestions(
+            questionData
+          );
+
+        }
+
+
+
+
+        const scoringResponse =
+          await fetch(
+            `http://localhost:3001/scoring/${assessmentId}`
+          );
+
+
+        if (scoringResponse.ok) {
+
+          const scoringText =
+            await scoringResponse.text();
+
+
+          const scoringData =
+            scoringText
+              ? JSON.parse(scoringText)
+              : null;
+
+
+          if (scoringData) {
+
+            setRules({
+
+              ...DEFAULT_RULES,
+
+              ...scoringData
+
+            });
+
+          }
+
+        }
+
+
       }
+      catch (error) {
+
+        console.error(
+          "Unable to load scoring data.",
+          error
+        );
+
+      }
+
     }
+
+
+    loadData();
+
+
   }, [assessmentId]);
 
   /*
@@ -219,7 +276,6 @@ export default function ScoringRulesPage() {
       }),
     );
 
-    setSaved(false);
     setErrors([]);
   }
 
@@ -285,51 +341,108 @@ export default function ScoringRulesPage() {
   ============================================================
   */
 
-  function saveScoring() {
+  async function saveScoring() {
+
+
     const payload = {
+
       assessmentId,
 
-      totalMarks,
+
       passPercentage:
         rules.passPercentage,
-      passMarks,
+
 
       maximumAttempts:
         rules.maximumAttempts,
 
+
       negativeMarking:
         rules.negativeMarking,
+
 
       negativeMarkValue:
         rules.negativeMarking
           ? rules.negativeMarkValue
-          : 0,
+          : null,
+
 
       partialMarking:
         rules.partialMarking,
 
+
       allowBackNavigation:
         rules.allowBackNavigation,
+
 
       allowQuestionSkip:
         rules.allowQuestionSkip,
 
+
       autoSubmitOnTimeout:
         rules.autoSubmitOnTimeout,
 
-      updatedAt:
-        new Date().toISOString(),
     };
 
-    sessionStorage.setItem(
-      `assessmentScoring:${assessmentId}`,
-      JSON.stringify(
-        payload,
-      ),
-    );
 
-    setSaved(true);
+
+    try {
+
+
+      const response =
+        await fetch(
+          "http://localhost:3001/scoring",
+          {
+
+            method:
+              "POST",
+
+
+            headers: {
+
+              "Content-Type":
+                "application/json",
+
+            },
+
+
+            body:
+              JSON.stringify(payload),
+
+          }
+        );
+
+
+
+      if (!response.ok) {
+
+        throw new Error(
+          "Unable to save scoring rules"
+        );
+
+      }
+
+
+      console.log("Scoring saved successfully");
+
+      return true;
+
+
+    }
+    catch(error) {
+
+      console.error(
+        "Save scoring failed:",
+        error
+      );
+
+      return false;
+
+    }
+
+
   }
+
 
   /*
   ============================================================
@@ -337,16 +450,22 @@ export default function ScoringRulesPage() {
   ============================================================
   */
 
-  function saveAndContinue() {
+  async function saveAndContinue() {
     if (!validateRules()) {
       return;
     }
 
-    saveScoring();
+    const saved =
+      await saveScoring();
 
-    router.push(
-      `/assessments/${assessmentId}/delivery`,
-    );
+
+    if(saved){
+
+      router.push(
+        `/assessments/${assessmentId}/delivery`,
+      );
+
+    }
   }
 
   /*
@@ -901,24 +1020,6 @@ export default function ScoringRulesPage() {
           </button>
 
           <div className="footer-actions">
-
-            {saved && (
-
-              <span className="saved-message">
-                Draft saved
-              </span>
-
-            )}
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={
-                saveScoring
-              }
-            >
-              Save Draft
-            </button>
 
             <button
               type="button"

@@ -188,55 +188,154 @@ export default function DeliveryPage() {
   const [errors, setErrors] =
     useState<string[]>([]);
 
-  const [saved, setSaved] =
-    useState(false);
+
 
   /* ============================================================
      LOAD
      ============================================================ */
 
   useEffect(() => {
-    const assessmentRaw =
-      sessionStorage.getItem(
-        "assessmentDraft",
-      );
+    async function loadAssessment() {
 
-    if (assessmentRaw) {
       try {
-        setAssessment(
-          JSON.parse(
-            assessmentRaw,
-          ),
-        );
-      } catch {
-        console.error(
-          "Unable to load assessment.",
-        );
-      }
-    }
 
-    const deliveryRaw =
-      sessionStorage.getItem(
-        `assessmentDelivery:${assessmentId}`,
-      );
-
-    if (deliveryRaw) {
-      try {
-        const stored =
-          JSON.parse(
-            deliveryRaw,
+        const response =
+          await fetch(
+            `http://localhost:3001/assessment/${assessmentId}`
           );
 
-        setDelivery({
-          ...DEFAULT_DELIVERY,
-          ...stored,
-        });
-      } catch {
-        console.error(
-          "Unable to load delivery settings.",
-        );
+
+        if(response.ok){
+
+          const data =
+            await response.json();
+
+
+          setAssessment({
+
+            id: data.id,
+
+            title: data.title,
+
+            code: data.code,
+
+            totalMarks: data.totalMarks ?? 0,
+
+            plannedQuestions: data.plannedQuestions ?? 0,
+
+            durationMinutes: data.durationMinutes ?? 0,
+
+          });
+
+        }
+
+
       }
+      catch(error){
+
+        console.error(
+          "Unable to load assessment:",
+          error
+        );
+
+      }
+
     }
+
+
+
+    loadAssessment();
+
+
+
+    async function loadDelivery() {
+
+      try {
+
+        const response =
+          await fetch(
+            `http://localhost:3001/delivery/${assessmentId}`
+          );
+
+
+        if (response.ok) {
+
+          const data =
+            await response.json();
+
+
+          if (data) {
+
+
+            setDelivery({
+
+              ...DEFAULT_DELIVERY,
+
+
+              ...(data.delivery ?? {}),
+
+
+              ...(data.security ?? {}),
+
+
+
+              startDate:
+                data.delivery?.startsAt
+                  ? new Date(data.delivery.startsAt)
+                      .toISOString()
+                      .split("T")[0]
+                  : "",
+
+
+
+              startTime:
+                data.delivery?.startsAt
+                  ? new Date(data.delivery.startsAt)
+                      .toISOString()
+                      .substring(11,16)
+                  : "",
+
+
+
+              endDate:
+                data.delivery?.endsAt
+                  ? new Date(data.delivery.endsAt)
+                      .toISOString()
+                      .split("T")[0]
+                  : "",
+
+
+
+              endTime:
+                data.delivery?.endsAt
+                  ? new Date(data.delivery.endsAt)
+                      .toISOString()
+                      .substring(11,16)
+                  : "",
+
+
+            });
+
+
+            return;
+
+          }
+
+        }
+
+      } catch(error) {
+
+        console.error(
+          "Unable to load delivery from backend:",
+          error
+        );
+
+      }
+
+    }
+
+
+    loadDelivery();
   }, [assessmentId]);
 
   /* ============================================================
@@ -258,7 +357,6 @@ export default function DeliveryPage() {
 
     setErrors([]);
 
-    setSaved(false);
   }
 
   /* ============================================================
@@ -271,44 +369,44 @@ export default function DeliveryPage() {
 
     /* Availability */
 
-    if (!delivery.startDate) {
+    if (!(delivery.startDate ?? "")) {
       validationErrors.push(
         "Start date is required.",
       );
     }
 
-    if (!delivery.startTime) {
+    if (!(delivery.startTime ?? "")) {
       validationErrors.push(
         "Start time is required.",
       );
     }
 
-    if (!delivery.endDate) {
+    if (!(delivery.endDate ?? "")) {
       validationErrors.push(
         "End date is required.",
       );
     }
 
-    if (!delivery.endTime) {
+    if (!(delivery.endTime ?? "")) {
       validationErrors.push(
         "End time is required.",
       );
     }
 
     if (
-      delivery.startDate &&
-      delivery.startTime &&
-      delivery.endDate &&
-      delivery.endTime
+      (delivery.startDate ?? "") &&
+      (delivery.startTime ?? "" )&&
+      (delivery.endDate ?? "") &&
+      (delivery.endTime ?? "")
     ) {
       const start =
         new Date(
-          `${delivery.startDate}T${delivery.startTime}`,
+          `${delivery.startDate ?? ""}T${delivery.startTime ?? ""}`,
         );
 
       const end =
         new Date(
-          `${delivery.endDate}T${delivery.endTime}`,
+          `${delivery.endDate ?? ""}T${delivery.endTime ?? ""}`,
         );
 
       if (end <= start) {
@@ -325,7 +423,7 @@ export default function DeliveryPage() {
         "BATCH" ||
         delivery.audienceType ===
           "GROUP") &&
-      !delivery.batchOrGroup.trim()
+      !(delivery.batchOrGroup ?? "").trim()
     ) {
       validationErrors.push(
         "Select or enter a batch/group.",
@@ -335,7 +433,7 @@ export default function DeliveryPage() {
     if (
       delivery.audienceType ===
         "SELECTED_LEARNERS" &&
-      !delivery.selectedLearners.trim()
+      !(delivery.selectedLearners ?? "").trim()
     ) {
       validationErrors.push(
         "Enter at least one learner.",
@@ -385,40 +483,253 @@ export default function DeliveryPage() {
      SAVE
      ============================================================ */
 
-  function saveDelivery() {
+  async function saveDelivery(): Promise<boolean> {
+
+
     const payload = {
+
       assessmentId,
 
-      ...delivery,
 
-      updatedAt:
-        new Date().toISOString(),
+      // Availability
+      startDate:
+        delivery.startDate ?? "",
+
+      startTime:
+        delivery.startTime ?? "",
+
+      endDate:
+        delivery.endDate ?? "",
+
+      endTime:
+        delivery.endTime ?? "",
+
+
+      // Assignment
+      audienceType:
+        delivery.audienceType,
+
+      batchOrGroup:
+        delivery.batchOrGroup ?? "",
+
+      selectedLearners:
+        delivery.selectedLearners ?? "",
+
+
+      // AI Policy
+      aiPolicy:
+        delivery.aiPolicy,
+
+
+      // Security
+      fullscreenMode:
+        Boolean(delivery.fullscreenMode),
+
+      tabSwitchDetection:
+        Boolean(delivery.tabSwitchDetection),
+
+      copyPasteDetection:
+        Boolean(delivery.copyPasteDetection),
+
+      copyPasteRestriction:
+        Boolean(delivery.copyPasteRestriction),
+
+      textSelectionDetection:
+        Boolean(delivery.textSelectionDetection),
+
+      textSelectionRestriction:
+        Boolean(delivery.textSelectionRestriction),
+
+      autoSubmitOnViolation:
+        Boolean(delivery.autoSubmitOnViolation),
+
+
+      // Advanced Security
+      maximumTabSwitches:
+        Number(delivery.maximumTabSwitches ?? 0),
+
+      violationLimit:
+        Number(delivery.violationLimit ?? 1),
+
+      allowedIpAddresses:
+        delivery.allowedIpAddresses ?? "",
+
+      devicePolicy:
+        delivery.devicePolicy,
+
+
+      cameraProctoring:
+        Boolean(delivery.cameraProctoring),
+
+      microphoneMonitoring:
+        Boolean(delivery.microphoneMonitoring),
+
+      identityVerification:
+        Boolean(delivery.identityVerification),
+
+      blockBrowserExtensions:
+        Boolean(delivery.blockBrowserExtensions),
+
+      disableRightClick:
+        Boolean(delivery.disableRightClick),
+
+      preventPrinting:
+        Boolean(delivery.preventPrinting),
+
+      preventScreenshots:
+        Boolean(delivery.preventScreenshots),
+
     };
 
-    sessionStorage.setItem(
-      `assessmentDelivery:${assessmentId}`,
-      JSON.stringify(
-        payload,
-      ),
-    );
 
-    setSaved(true);
+
+    try {
+
+
+      console.log(
+        "DELIVERY REQUEST PAYLOAD:",
+        JSON.stringify(
+          payload,
+          null,
+          2
+        )
+      );
+
+
+
+      const response =
+        await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/delivery`,
+          {
+
+            method:"POST",
+
+            headers:{
+              "Content-Type":"application/json",
+            },
+
+            body:
+              JSON.stringify(payload),
+
+          }
+        );
+
+
+
+      console.log(
+        "DELIVERY STATUS:",
+        response.status
+      );
+
+
+
+      console.log(
+        "DELIVERY HEADERS:",
+        [...response.headers.entries()]
+      );
+
+
+
+      let responseText = "";
+
+      try {
+
+        responseText =
+          await response.text();
+
+      }
+
+      catch(error){
+
+        console.error(
+          "RESPONSE READ ERROR:",
+          error
+        );
+
+      }
+
+
+
+      console.log(
+        "DELIVERY RESPONSE BODY:",
+        responseText
+      );
+
+
+
+      if(!response.ok){
+
+
+        alert(
+          `Unable to save delivery
+
+Status: ${response.status}
+
+${responseText}`
+        );
+
+
+        return false;
+
+
+      }
+
+
+
+      return true;
+
+
+
+    }
+
+    catch(error){
+
+
+      console.error(
+        "DELIVERY SAVE ERROR:",
+        error
+      );
+
+
+      alert(
+        "Delivery API connection failed"
+      );
+
+
+      return false;
+
+
+    }
+
+
   }
+
 
   /* ============================================================
      SAVE & CONTINUE
      ============================================================ */
 
-  function saveAndContinue() {
+  async function saveAndContinue() {
+
     if (!validateDelivery()) {
+
       return;
+
     }
 
-    saveDelivery();
 
-    router.push(
-      `/assessments/${assessmentId}/review`,
-    );
+    const saved =
+      await saveDelivery();
+
+
+    if(saved) {
+
+      router.push(
+        `/assessments/${assessmentId}/review`,
+      );
+
+    }
+
   }
 
   /* ============================================================
@@ -606,7 +917,7 @@ export default function DeliveryPage() {
               <input
                 type="date"
                 value={
-                  delivery.startDate
+                  delivery.startDate ?? ""
                 }
                 onChange={(event) =>
                   updateField(
@@ -627,7 +938,7 @@ export default function DeliveryPage() {
               <input
                 type="time"
                 value={
-                  delivery.startTime
+                  delivery.startTime ?? ""
                 }
                 onChange={(event) =>
                   updateField(
@@ -648,7 +959,7 @@ export default function DeliveryPage() {
               <input
                 type="date"
                 value={
-                  delivery.endDate
+                  delivery.endDate ?? ""
                 }
                 onChange={(event) =>
                   updateField(
@@ -669,7 +980,7 @@ export default function DeliveryPage() {
               <input
                 type="time"
                 value={
-                  delivery.endTime
+                  delivery.endTime ?? ""
                 }
                 onChange={(event) =>
                   updateField(
@@ -784,7 +1095,7 @@ export default function DeliveryPage() {
                 <input
                   type="text"
                   value={
-                    delivery.batchOrGroup
+                    delivery.batchOrGroup ?? ""
                   }
                   onChange={(event) =>
                     updateField(
@@ -816,7 +1127,7 @@ export default function DeliveryPage() {
                 <textarea
                   rows={4}
                   value={
-                    delivery.selectedLearners
+                    delivery.selectedLearners ?? ""
                   }
                   onChange={(event) =>
                     updateField(
@@ -1240,7 +1551,7 @@ export default function DeliveryPage() {
                   <textarea
                     rows={4}
                     value={
-                      delivery.allowedIpAddresses
+                      delivery.allowedIpAddresses ?? ""
                     }
                     onChange={(event) =>
                       updateField(
@@ -1468,22 +1779,6 @@ export default function DeliveryPage() {
           </button>
 
           <div className="footer-actions">
-
-            {saved && (
-              <span className="saved-message">
-                Draft saved
-              </span>
-            )}
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={
-                saveDelivery
-              }
-            >
-              Save Draft
-            </button>
 
             <button
               type="button"

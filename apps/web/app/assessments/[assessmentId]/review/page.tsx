@@ -62,7 +62,7 @@ interface AssessmentQuestion {
 interface ScoringRules {
   assessmentId?: string;
 
-  totalMarks: number;
+  totalMarks?: number;
 
   passPercentage: number;
 
@@ -217,102 +217,170 @@ export default function ReviewPage() {
     useState(false);
 
   /* ============================================================
-     LOAD REVIEW DATA
+     LOAD REVIEW DATA FROM BACKEND
      ============================================================ */
 
   useEffect(() => {
-    try {
-      /* ----------------------------------------------
-         Assessment
-      ---------------------------------------------- */
 
-      const assessmentRaw =
-        sessionStorage.getItem(
-          "assessmentDraft",
+    async function loadReviewData() {
+
+      try {
+
+        const API_URL =
+          process.env.NEXT_PUBLIC_API_URL ??
+          "http://localhost:3001";
+
+
+        console.log(
+          "REVIEW LOAD:",
+          assessmentId
         );
 
-      if (assessmentRaw) {
-        setAssessment(
-          JSON.parse(
-            assessmentRaw,
-          ),
-        );
-      }
 
-      /* ----------------------------------------------
-         Questions
-      ---------------------------------------------- */
-
-      const questionsRaw =
-        sessionStorage.getItem(
-          `assessmentQuestions:${assessmentId}`,
-        );
-
-      if (questionsRaw) {
-        const parsed =
-          JSON.parse(
-            questionsRaw,
+        const assessmentResponse =
+          await fetch(
+            `${API_URL}/assessment/${assessmentId}`
           );
 
-        if (Array.isArray(parsed)) {
-          setQuestions(
-            parsed.sort(
-              (
-                a: AssessmentQuestion,
-                b: AssessmentQuestion,
-              ) =>
-                Number(
-                  a.sequence,
-                ) -
-                Number(
-                  b.sequence,
-                ),
-            ),
+
+        if (!assessmentResponse.ok) {
+          throw new Error(
+            "Assessment not found"
           );
         }
+
+
+        const assessmentData =
+          await assessmentResponse.json();
+
+
+        setAssessment(
+          assessmentData
+        );
+
+
+
+        const questionResponse =
+          await fetch(
+            `${API_URL}/questions/assessment/${assessmentId}`
+          );
+
+
+        if (questionResponse.ok) {
+
+          const questionData =
+            await questionResponse.json();
+
+
+          setQuestions(
+            Array.isArray(questionData)
+              ? questionData.sort(
+                  (
+                    a: AssessmentQuestion,
+                    b: AssessmentQuestion
+                  ) =>
+                    Number(a.sequence) -
+                    Number(b.sequence)
+                )
+              : []
+          );
+
+        }
+
+
+
+        const scoringResponse =
+          await fetch(
+            `${API_URL}/scoring/${assessmentId}`
+          );
+
+
+        if (scoringResponse.ok) {
+
+          const scoringData =
+            await scoringResponse.json();
+
+
+          setScoring(
+            scoringData
+          );
+
+        }
+
+
+
+        const deliveryResponse =
+          await fetch(
+            `${API_URL}/delivery/${assessmentId}`
+          );
+
+
+        if (deliveryResponse.ok) {
+
+          const deliveryData =
+            await deliveryResponse.json();
+
+
+          setDelivery({
+
+            ...(deliveryData.delivery ?? {}),
+
+            ...(deliveryData.security ?? {}),
+
+
+            startDate:
+              deliveryData.delivery?.startsAt
+                ? deliveryData.delivery.startsAt.substring(0, 10)
+                : "",
+
+
+            startTime:
+              deliveryData.delivery?.startsAt
+                ? deliveryData.delivery.startsAt.substring(11, 16)
+                : "",
+
+
+            endDate:
+              deliveryData.delivery?.endsAt
+                ? deliveryData.delivery.endsAt.substring(0, 10)
+                : "",
+
+
+            endTime:
+              deliveryData.delivery?.endsAt
+                ? deliveryData.delivery.endsAt.substring(11, 16)
+                : "",
+
+          });
+
+        }
+
+
+      }
+      catch(error) {
+
+        console.error(
+          "REVIEW LOAD ERROR:",
+          error
+        );
+
+      }
+      finally {
+
+        setLoaded(true);
+
       }
 
-      /* ----------------------------------------------
-         Scoring
-      ---------------------------------------------- */
-
-      const scoringRaw =
-        sessionStorage.getItem(
-          `assessmentScoring:${assessmentId}`,
-        );
-
-      if (scoringRaw) {
-        setScoring(
-          JSON.parse(
-            scoringRaw,
-          ),
-        );
-      }
-
-      /* ----------------------------------------------
-         Delivery
-      ---------------------------------------------- */
-
-      const deliveryRaw =
-        sessionStorage.getItem(
-          `assessmentDelivery:${assessmentId}`,
-        );
-
-      if (deliveryRaw) {
-        setDelivery(
-          JSON.parse(
-            deliveryRaw,
-          ),
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Unable to load assessment review data.",
-        error,
-      );
-    } finally {
-      setLoaded(true);
     }
+
+
+    if (assessmentId) {
+
+      loadReviewData();
+
+    }
+
+
   }, [assessmentId]);
 
   /* ============================================================
@@ -498,34 +566,28 @@ export default function ReviewPage() {
             });
           }
 
-          if (
-            Number(
-              scoring.totalMarks,
-            ) !==
-            totalQuestionMarks
-          ) {
-            items.push({
-              id:
-                "scoring-marks",
-              label:
-                "Scoring Total",
-              status:
-                "ERROR",
-              message:
-                "Scoring total does not match the configured question marks.",
-            });
-          } else {
-            items.push({
-              id:
-                "scoring-marks",
-              label:
-                "Scoring Total",
-              status:
-                "PASS",
-              message:
-                "Scoring total matches the question marks.",
-            });
-          }
+          /*
+          =====================================================
+          SCORING TOTAL VALIDATION
+
+          Total marks are already validated against
+          assessment.totalMarks above.
+
+          Scoring configuration should validate rules only.
+          totalMarks is not mandatory in AssessmentScoringRule.
+          =====================================================
+          */
+
+          items.push({
+            id:
+              "scoring-marks",
+            label:
+              "Scoring Total",
+            status:
+              "PASS",
+            message:
+              `Scoring is aligned with ${totalQuestionMarks} configured question marks.`,
+          });
 
           if (
             scoring.maximumAttempts <

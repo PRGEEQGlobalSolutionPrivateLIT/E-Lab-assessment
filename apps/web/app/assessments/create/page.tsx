@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+
 import "./create-assessment.css";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:3001";
 
 type AssessmentType =
   | "CODING_ASSESSMENT"
@@ -80,8 +84,8 @@ export default function CreateAssessmentPage() {
   const [errors, setErrors] =
     useState<string[]>([]);
 
-  const [saved, setSaved] =
-    useState(false);
+  // const [saved, setSaved] =
+  //   useState(false);
 
   function updateField<
     K extends keyof AssessmentForm,
@@ -94,132 +98,288 @@ export default function CreateAssessmentPage() {
       [field]: value,
     }));
 
-    setSaved(false);
+    // setSaved(false);
   }
 
   function validateForm() {
-    const validationErrors:
-      string[] = [];
 
-    if (!form.title.trim()) {
-      validationErrors.push(
-        "Assessment title is required.",
-      );
-    }
+  const validationErrors:string[] = [];
 
-    if (
-      form.title.trim().length <
-      5
-    ) {
-      validationErrors.push(
-        "Assessment title must contain at least 5 characters.",
-      );
-    }
 
-    if (!form.code.trim()) {
-      validationErrors.push(
-        "Assessment code is required.",
-      );
-    }
+  if (!form.title.trim()) {
 
-    if (
-      form.plannedQuestions <= 0
-    ) {
-      validationErrors.push(
-        "Planned questions must be greater than zero.",
-      );
-    }
-
-    if (form.totalMarks <= 0) {
-      validationErrors.push(
-        "Total marks must be greater than zero.",
-      );
-    }
-
-    if (
-      form.durationMinutes <= 0
-    ) {
-      validationErrors.push(
-        "Assessment duration must be greater than zero.",
-      );
-    }
-
-    setErrors(
-      validationErrors,
+    validationErrors.push(
+      "Assessment title is required."
     );
 
-    return (
-      validationErrors.length ===
-      0
-    );
   }
 
-  function saveDraft() {
-    if (!validateForm()) {
-      return;
-    }
 
-    const draft = {
-      ...form,
+  if (
+    form.title.trim() &&
+    form.title.trim().length < 5
+  ) {
 
-      status: "DRAFT",
-
-      updatedAt:
-        new Date().toISOString(),
-    };
-
-    sessionStorage.setItem(
-      "assessmentDraft",
-      JSON.stringify(draft),
+    validationErrors.push(
+      "Assessment title must contain minimum 5 characters."
     );
 
-    setSaved(true);
+  }
+
+
+  if (!form.code.trim()) {
+
+    validationErrors.push(
+      "Assessment code is required."
+    );
+
+  }
+
+
+  if (!form.technology.trim()) {
+
+    validationErrors.push(
+      "Technology selection is required."
+    );
+
+  }
+
+
+  if (!form.description.trim()) {
+
+    validationErrors.push(
+      "Assessment description is required."
+    );
+
+  }
+
+
+  if (!form.instructions.trim()) {
+
+    validationErrors.push(
+      "Learner instructions are required."
+    );
+
+  }
+
+
+  if (form.plannedQuestions <= 0) {
+
+    validationErrors.push(
+      "Planned questions must be greater than zero."
+    );
+
+  }
+
+
+  if (form.totalMarks <= 0) {
+
+    validationErrors.push(
+      "Total marks must be greater than zero."
+    );
+
+  }
+
+
+  if (form.durationMinutes <= 0) {
+
+    validationErrors.push(
+      "Duration must be greater than zero."
+    );
+
+  }
+
+
+  setErrors(validationErrors);
+
+
+  return validationErrors.length === 0;
+
+}
+
+  // function saveDraft() {
+  //   if (!validateForm()) {
+  //     return;
+  //   }
+
+  //   const draft = {
+  //     ...form,
+
+  //     status: "DRAFT",
+
+  //     updatedAt:
+  //       new Date().toISOString(),
+  //   };
+
+  //   sessionStorage.setItem(
+  //     "assessmentDraft",
+  //     JSON.stringify(draft),
+  //   );
+
+  //   setSaved(true);
+
+  //   console.log(
+  //     "Assessment draft:",
+  //     draft,
+  //   );
+  // }
+
+  async function saveAndContinue() {
+
+
+  if (!validateForm()) {
+
+    return;
+
+  }
+
+
+
+  try {
+
+
+    const response =
+      await fetch(
+        `${API_URL}/assessment`,
+        {
+
+          method:"POST",
+
+
+          headers:{
+
+            "Content-Type":
+              "application/json",
+
+          },
+
+
+          body:JSON.stringify({
+
+            organizationId:
+              "ORG001",
+
+
+            title:
+              form.title.trim(),
+
+
+            code:
+              form.code.trim(),
+
+
+            assessmentType:
+              form.type,
+
+
+            description:
+              form.description.trim(),
+
+
+            instructions:
+              form.instructions.trim(),
+
+
+            technology:
+              form.technology,
+
+
+            difficulty:
+              form.difficulty,
+
+
+            plannedQuestions:
+              form.plannedQuestions,
+
+
+            totalMarks:
+              form.totalMarks,
+
+
+            durationMinutes:
+              form.durationMinutes,
+
+
+            createdByUserId:
+              "ADMIN001",
+
+          })
+
+        }
+
+      );
+
+
+
+
+   if(!response.ok){
+
+  const errorText =
+    await response.text();
+
+  console.log(
+    "BACKEND RESPONSE ERROR:",
+    errorText
+  );
+
+  throw new Error(
+    errorText
+  );
+
+}
+
+
+
+    const assessment =
+      await response.json();
+
+
 
     console.log(
-      "Assessment draft:",
-      draft,
-    );
-  }
-
-  function saveAndContinue() {
-    if (!validateForm()) {
-      return;
-    }
-
-    const assessmentId =
-      crypto.randomUUID();
-
-    const assessment = {
-      id: assessmentId,
-
-      ...form,
-
-      status: "DRAFT",
-
-      createdAt:
-        new Date().toISOString(),
-
-      updatedAt:
-        new Date().toISOString(),
-    };
-
-    sessionStorage.setItem(
-      "assessmentDraft",
-      JSON.stringify(
-        assessment,
-      ),
+      "Created Assessment:",
+      assessment
     );
 
+
+
     sessionStorage.setItem(
+
       "currentAssessmentId",
-      assessmentId,
+
+      assessment.id
+
     );
+
+
 
     router.push(
-      `/assessments/${assessmentId}/structure`,
+
+      `/assessments/${assessment.id}/questions`
+
     );
+
+
   }
 
+  catch(error){
+
+
+    console.error(
+      error
+    );
+
+
+    setErrors([
+
+      "Unable to save assessment. Please try again."
+
+    ]);
+
+
+  }
+
+
+}
   return (
     <main className="create-assessment-page">
 
@@ -340,11 +500,11 @@ export default function CreateAssessmentPage() {
 
               </div>
 
-              {saved && (
+              {/* {saved && (
                 <span className="saved-message">
                   Saved
                 </span>
-              )}
+              )} */}
 
             </div>
 
@@ -890,7 +1050,7 @@ export default function CreateAssessmentPage() {
 
               <div className="footer-actions">
 
-                <button
+                {/* <button
                   type="button"
                   className="secondary-button"
                   onClick={
@@ -898,7 +1058,7 @@ export default function CreateAssessmentPage() {
                   }
                 >
                   Save Draft
-                </button>
+                </button> */}
 
                 <button
                   type="button"

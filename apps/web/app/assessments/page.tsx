@@ -1,16 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import "./assessments.css";
 
 type AssessmentStatus =
   | "DRAFT"
-  | "IN_REVIEW"
-  | "APPROVED"
-  | "PUBLISHED"
-  | "ARCHIVED";
+  | "COMPLETED"
+  | "PUBLISHED";
 
 interface Assessment {
   id: string;
@@ -28,108 +26,22 @@ interface Assessment {
   status: AssessmentStatus;
 
   updatedAt: string;
+
+  builderStep?: string;
 }
-
-const SAMPLE_ASSESSMENTS: Assessment[] = [
-  {
-    id: "assessment-001",
-    code: "C-FUND-L1-001",
-
-    title:
-      "C Programming Fundamentals - Level 1",
-
-    type: "Coding Assessment",
-
-    technology: "C",
-
-    difficulty: "Beginner",
-
-    questions: 10,
-
-    marks: 100,
-
-    duration: 60,
-
-    status: "DRAFT",
-
-    updatedAt: "02 Sep 2026",
-  },
-
-  {
-    id: "assessment-002",
-    code: "C-ARRAY-001",
-
-    title:
-      "C Arrays and Functions Assessment",
-
-    type: "Coding Assessment",
-
-    technology: "C",
-
-    difficulty: "Intermediate",
-
-    questions: 15,
-
-    marks: 100,
-
-    duration: 75,
-
-    status: "IN_REVIEW",
-
-    updatedAt: "01 Sep 2026",
-  },
-
-  {
-    id: "assessment-003",
-    code: "C-SCREEN-001",
-
-    title:
-      "C Developer Screening Assessment",
-
-    type: "Screening",
-
-    technology: "C",
-
-    difficulty: "Intermediate",
-
-    questions: 20,
-
-    marks: 100,
-
-    duration: 90,
-
-    status: "PUBLISHED",
-
-    updatedAt: "31 Aug 2026",
-  },
-
-  {
-    id: "assessment-004",
-    code: "C-ADV-001",
-
-    title:
-      "Advanced C Programming Assessment",
-
-    type: "Skill Assessment",
-
-    technology: "C",
-
-    difficulty: "Advanced",
-
-    questions: 12,
-
-    marks: 120,
-
-    duration: 90,
-
-    status: "APPROVED",
-
-    updatedAt: "30 Aug 2026",
-  },
-];
 
 export default function AssessmentsPage() {
   const router = useRouter();
+
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:3001";
+
+  const [assessments, setAssessments] =
+    useState<Assessment[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
 
   const [search, setSearch] =
     useState("");
@@ -146,9 +58,289 @@ export default function AssessmentsPage() {
   const [difficulty, setDifficulty] =
     useState("ALL");
 
+  useEffect(() => {
+    loadAssessments();
+  }, []);
+
+  async function loadAssessments() {
+    try {
+      const response =
+        await fetch(
+          `${API_URL}/assessment`
+        );
+
+      if (!response.ok) {
+        throw new Error(
+          `Unable to load assessments (${response.status})`
+        );
+      }
+
+      const responseData =
+        await response.json();
+
+      const data =
+        Array.isArray(responseData)
+          ? responseData
+          : Array.isArray(responseData?.data)
+            ? responseData.data
+            : [];
+
+      const normalizedStatus = (
+        value: string
+      ): AssessmentStatus => {
+        const status =
+          value?.toUpperCase();
+
+        if (
+          status === "PUBLISHED"
+        ) {
+          return "PUBLISHED";
+        }
+
+        if (
+          status === "COMPLETED" ||
+          status === "APPROVED" ||
+          status === "IN_REVIEW"
+        ) {
+          return "COMPLETED";
+        }
+
+        return "DRAFT";
+      };
+
+      const formatText = (
+        value: string | null | undefined
+      ) => {
+        if (!value) {
+          return "-";
+        }
+
+        return value
+          .replaceAll("_", " ")
+          .toLowerCase()
+          .replace(
+            /\b\w/g,
+            (char) => char.toUpperCase()
+          );
+      };
+
+      setAssessments(
+        data.map((item: any) => ({
+          id:
+            String(item.id ?? ""),
+
+          code:
+            String(item.code ?? "-"),
+
+          title:
+            String(
+              item.title ??
+              "Untitled Assessment"
+            ),
+
+          type:
+            formatText(
+              item.assessmentType
+            ),
+
+          technology:
+            item.technology
+              ? String(item.technology)
+              : "-",
+
+          difficulty:
+            formatText(
+              item.difficulty
+            ),
+
+          questions:
+            Number(
+              item.plannedQuestions ?? 0
+            ),
+
+          marks:
+            Number(
+              item.totalMarks ?? 0
+            ),
+
+          duration:
+            Number(
+              item.durationMinutes ?? 0
+            ),
+
+          status:
+            normalizedStatus(
+              item.status
+            ),
+
+          builderStep:
+            item.builderStep
+              ? String(item.builderStep)
+              : "SETUP",
+
+          updatedAt:
+            item.updatedAt
+              ? new Date(
+                  item.updatedAt
+                ).toLocaleDateString()
+              : "-"
+        }))
+      );
+    } catch (error) {
+      console.error(
+        "ASSESSMENT LOAD ERROR",
+        error
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function openAssessment(
+    assessment: Assessment
+  ) {
+    if (
+      assessment.status === "PUBLISHED"
+    ) {
+      router.push(
+        `/assessments/${assessment.id}/review?mode=view`
+      );
+
+      return;
+    }
+
+    if (
+      assessment.status === "DRAFT"
+    ) {
+      const step =
+        assessment.builderStep
+          ?.toLowerCase() ||
+        "setup";
+
+      router.push(
+        `/assessments/${assessment.id}/${step}`
+      );
+
+      return;
+    }
+
+    router.push(
+      `/assessments/${assessment.id}/review`
+    );
+  }
+
+  /**
+   * Open results for this assessment.
+   *
+   * This page is intended for the person
+   * who has permission to view the
+   * assessment results.
+   */
+  function openResults(
+    assessment: Assessment
+  ) {
+    router.push(
+      `/assessments/${assessment.id}/results`
+    );
+  }
+
+  async function deleteAssessment(
+    id: string
+  ) {
+    await fetch(
+      `${API_URL}/assessment/${id}`,
+      {
+        method: "DELETE"
+      }
+    );
+
+    loadAssessments();
+  }
+
+  function cloneAssessment(
+    id: string
+  ) {
+    router.push(
+      `/assessments/create?clone=${id}`
+    );
+  }
+
+  async function unpublishAssessment(
+    id: string
+  ) {
+    await fetch(
+      `${API_URL}/assessment/${id}/unpublish`,
+      {
+        method: "PATCH"
+      }
+    );
+
+    loadAssessments();
+  }
+
+  const assessmentTypes =
+    useMemo(
+      () =>
+        Array.from(
+          new Set(
+            assessments
+              .map(
+                (item) =>
+                  item.type
+              )
+              .filter(
+                (value) =>
+                  Boolean(value) &&
+                  value !== "-"
+              )
+          )
+        ).sort(),
+      [assessments]
+    );
+
+  const technologies =
+    useMemo(
+      () =>
+        Array.from(
+          new Set(
+            assessments
+              .map(
+                (item) =>
+                  item.technology
+              )
+              .filter(
+                (value) =>
+                  Boolean(value) &&
+                  value !== "-"
+              )
+          )
+        ).sort(),
+      [assessments]
+    );
+
+  const difficulties =
+    useMemo(
+      () =>
+        Array.from(
+          new Set(
+            assessments
+              .map(
+                (item) =>
+                  item.difficulty
+              )
+              .filter(
+                (value) =>
+                  Boolean(value) &&
+                  value !== "-"
+              )
+          )
+        ).sort(),
+      [assessments]
+    );
+
   const filteredAssessments =
     useMemo(() => {
-      return SAMPLE_ASSESSMENTS.filter(
+      return assessments.filter(
         (assessment) => {
           const searchValue =
             search.toLowerCase();
@@ -163,7 +355,8 @@ export default function AssessmentsPage() {
 
           const matchesStatus =
             status === "ALL" ||
-            assessment.status === status;
+            assessment.status ===
+              status;
 
           const matchesType =
             type === "ALL" ||
@@ -186,48 +379,49 @@ export default function AssessmentsPage() {
             matchesTechnology &&
             matchesDifficulty
           );
-        },
+        }
       );
     }, [
+      assessments,
       search,
       status,
       type,
       technology,
-      difficulty,
+      difficulty
     ]);
 
   const totalAssessments =
-    SAMPLE_ASSESSMENTS.length;
+    assessments.length;
 
   const draftCount =
-    SAMPLE_ASSESSMENTS.filter(
+    assessments.filter(
       (assessment) =>
-        assessment.status === "DRAFT",
+        assessment.status === "DRAFT"
     ).length;
 
-  const reviewCount =
-    SAMPLE_ASSESSMENTS.filter(
+  const completedCount =
+    assessments.filter(
       (assessment) =>
         assessment.status ===
-        "IN_REVIEW",
+        "COMPLETED"
     ).length;
 
   const publishedCount =
-    SAMPLE_ASSESSMENTS.filter(
+    assessments.filter(
       (assessment) =>
         assessment.status ===
-        "PUBLISHED",
+        "PUBLISHED"
     ).length;
 
   function createAssessment() {
     router.push(
-      "/assessments/create",
+      "/assessments/create"
     );
   }
 
   function getStatusClass(
     assessmentStatus:
-      AssessmentStatus,
+      AssessmentStatus
   ) {
     switch (
       assessmentStatus
@@ -235,17 +429,11 @@ export default function AssessmentsPage() {
       case "DRAFT":
         return "status-draft";
 
-      case "IN_REVIEW":
-        return "status-review";
-
-      case "APPROVED":
+      case "COMPLETED":
         return "status-approved";
 
       case "PUBLISHED":
         return "status-published";
-
-      case "ARCHIVED":
-        return "status-archived";
 
       default:
         return "";
@@ -254,7 +442,7 @@ export default function AssessmentsPage() {
 
   function formatStatus(
     assessmentStatus:
-      AssessmentStatus,
+      AssessmentStatus
   ) {
     return assessmentStatus
       .replaceAll("_", " ");
@@ -311,8 +499,8 @@ export default function AssessmentsPage() {
           />
 
           <SummaryCard
-            label="In Review"
-            value={reviewCount}
+            label="Completed"
+            value={completedCount}
           />
 
           <SummaryCard
@@ -343,7 +531,7 @@ export default function AssessmentsPage() {
               value={search}
               onChange={(event) =>
                 setSearch(
-                  event.target.value,
+                  event.target.value
                 )
               }
             />
@@ -354,7 +542,7 @@ export default function AssessmentsPage() {
               value={status}
               onChange={(event) =>
                 setStatus(
-                  event.target.value,
+                  event.target.value
                 )
               }
             >
@@ -367,20 +555,12 @@ export default function AssessmentsPage() {
                 Draft
               </option>
 
-              <option value="IN_REVIEW">
-                In Review
-              </option>
-
-              <option value="APPROVED">
-                Approved
+              <option value="COMPLETED">
+                Completed
               </option>
 
               <option value="PUBLISHED">
                 Published
-              </option>
-
-              <option value="ARCHIVED">
-                Archived
               </option>
 
             </select>
@@ -391,7 +571,7 @@ export default function AssessmentsPage() {
               value={type}
               onChange={(event) =>
                 setType(
-                  event.target.value,
+                  event.target.value
                 )
               }
             >
@@ -400,21 +580,16 @@ export default function AssessmentsPage() {
                 All Types
               </option>
 
-              <option
-                value="Coding Assessment"
-              >
-                Coding Assessment
-              </option>
-
-              <option
-                value="Skill Assessment"
-              >
-                Skill Assessment
-              </option>
-
-              <option value="Screening">
-                Screening
-              </option>
+              {assessmentTypes.map(
+                (typeValue) => (
+                  <option
+                    key={typeValue}
+                    value={typeValue}
+                  >
+                    {typeValue}
+                  </option>
+                )
+              )}
 
             </select>
 
@@ -424,7 +599,7 @@ export default function AssessmentsPage() {
               value={technology}
               onChange={(event) =>
                 setTechnology(
-                  event.target.value,
+                  event.target.value
                 )
               }
             >
@@ -433,9 +608,16 @@ export default function AssessmentsPage() {
                 All Technologies
               </option>
 
-              <option value="C">
-                C
-              </option>
+              {technologies.map(
+                (technologyValue) => (
+                  <option
+                    key={technologyValue}
+                    value={technologyValue}
+                  >
+                    {technologyValue}
+                  </option>
+                )
+              )}
 
             </select>
 
@@ -445,7 +627,7 @@ export default function AssessmentsPage() {
               value={difficulty}
               onChange={(event) =>
                 setDifficulty(
-                  event.target.value,
+                  event.target.value
                 )
               }
             >
@@ -454,23 +636,16 @@ export default function AssessmentsPage() {
                 All Difficulty
               </option>
 
-              <option
-                value="Beginner"
-              >
-                Beginner
-              </option>
-
-              <option
-                value="Intermediate"
-              >
-                Intermediate
-              </option>
-
-              <option
-                value="Advanced"
-              >
-                Advanced
-              </option>
+              {difficulties.map(
+                (difficultyValue) => (
+                  <option
+                    key={difficultyValue}
+                    value={difficultyValue}
+                  >
+                    {difficultyValue}
+                  </option>
+                )
+              )}
 
             </select>
 
@@ -479,6 +654,12 @@ export default function AssessmentsPage() {
         </section>
 
         {/* TABLE */}
+
+        {loading && (
+          <div className="empty-state">
+            Loading assessments...
+          </div>
+        )}
 
         <section
           className=
@@ -493,6 +674,7 @@ export default function AssessmentsPage() {
             <thead>
 
               <tr>
+
                 <th>
                   Assessment
                 </th>
@@ -532,6 +714,7 @@ export default function AssessmentsPage() {
                 <th>
                   Action
                 </th>
+
               </tr>
 
             </thead>
@@ -614,13 +797,12 @@ export default function AssessmentsPage() {
 
                       <span
                         className={`status-badge ${getStatusClass(
-                          assessment
-                            .status,
+                          assessment.status
                         )}`}
                       >
                         {formatStatus(
                           assessment
-                            .status,
+                            .status
                         )}
                       </span>
 
@@ -635,25 +817,93 @@ export default function AssessmentsPage() {
 
                     <td>
 
+                      {/* VIEW */}
+
                       <button
                         type="button"
-                        className=
-                          "assessment-action"
+                        className="assessment-action"
+                        onClick={() =>
+                          openAssessment(
+                            assessment
+                          )
+                        }
                       >
                         View
                       </button>
 
+                      {/* RESULTS */}
+
+                      <button
+                        type="button"
+                        className="assessment-action"
+                        onClick={() =>
+                          openResults(
+                            assessment
+                          )
+                        }
+                      >
+                        Results
+                      </button>
+
+                      {/* CLONE */}
+
+                      <button
+                        type="button"
+                        className="assessment-action"
+                        onClick={() =>
+                          cloneAssessment(
+                            assessment.id
+                          )
+                        }
+                      >
+                        Clone / Create New
+                      </button>
+
+                      {/* DELETE */}
+
+                      {assessment.status !==
+                        "PUBLISHED" && (
+                        <button
+                          type="button"
+                          className="assessment-action"
+                          onClick={() =>
+                            deleteAssessment(
+                              assessment.id
+                            )
+                          }
+                        >
+                          Delete
+                        </button>
+                      )}
+
+                      {/* UNPUBLISH */}
+
+                      {assessment.status ===
+                        "PUBLISHED" && (
+                        <button
+                          type="button"
+                          className="assessment-action"
+                          onClick={() =>
+                            unpublishAssessment(
+                              assessment.id
+                            )
+                          }
+                        >
+                          Unpublish
+                        </button>
+                      )}
+
                     </td>
 
                   </tr>
-                ),
+                )
               )}
 
             </tbody>
 
           </table>
 
-          {
+          {!loading &&
             filteredAssessments.length ===
               0 && (
               <div
@@ -664,8 +914,7 @@ export default function AssessmentsPage() {
                 match the selected
                 filters.
               </div>
-            )
-          }
+            )}
 
         </section>
 
@@ -682,7 +931,7 @@ interface SummaryCardProps {
 
 function SummaryCard({
   label,
-  value,
+  value
 }: SummaryCardProps) {
   return (
     <div className="summary-card">

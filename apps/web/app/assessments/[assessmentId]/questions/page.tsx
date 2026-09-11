@@ -13,10 +13,6 @@ import {
 
 import "./questions.css";
 
-type StructureMode =
-  | "NO_SECTIONS"
-  | "WITH_SECTIONS";
-
 type QuestionType =
   | "CODING"
   | "MCQ"
@@ -33,23 +29,6 @@ interface AssessmentDraft {
   durationMinutes: number;
   technology?: string;
   difficulty?: string;
-}
-
-interface AssessmentSection {
-  id: string;
-  name: string;
-  description: string;
-  plannedQuestions: number;
-  marks: number;
-  timeLimitMinutes: number | null;
-  mandatory: boolean;
-  randomizeQuestions: boolean;
-}
-
-interface AssessmentStructure {
-  assessmentId: string;
-  mode: StructureMode;
-  sections: AssessmentSection[];
 }
 
 interface AssessmentQuestion {
@@ -93,32 +72,14 @@ export default function AssessmentQuestionsPage() {
     useState<AssessmentDraft | null>(
       null,
     );
-
-  const [
-    structure,
-    setStructure,
-  ] =
-    useState<AssessmentStructure | null>(
-      null,
-    );
-
-  const [
+const [
     questions,
     setQuestions,
   ] =
     useState<AssessmentQuestion[]>(
       [],
     );
-
-  const [
-    selectedSectionId,
-    setSelectedSectionId,
-  ] =
-    useState<string | null>(
-      null,
-    );
-
-  const [
+const [
     showAddQuestion,
     setShowAddQuestion,
   ] =
@@ -132,11 +93,11 @@ export default function AssessmentQuestionsPage() {
       [],
     );
 
-  const [
-    saved,
-    setSaved,
-  ] =
-    useState(false);
+  // const [
+  //   saved,
+  //   setSaved,
+  // ] =
+  //   useState(false);
 
   /*
   ============================================================
@@ -144,87 +105,108 @@ export default function AssessmentQuestionsPage() {
   ============================================================
   */
 
-  useEffect(() => {
-    const assessmentData =
-      sessionStorage.getItem(
-        "assessmentDraft",
-      );
+ useEffect(() => {
 
-    if (
-      assessmentData
-    ) {
-      try {
-        setAssessment(
-          JSON.parse(
-            assessmentData,
-          ),
+  async function loadData() {
+
+    try {
+
+      const response =
+        await fetch(
+          `http://localhost:3001/assessment/${assessmentId}`
         );
-      } catch {
-        console.error(
-          "Unable to load assessment.",
+
+
+      if(!response.ok){
+
+        throw new Error(
+          "Assessment not found"
         );
+
       }
-    }
 
-    const structureData =
-      sessionStorage.getItem(
-        `assessmentStructure:${assessmentId}`,
+
+      const data =
+        await response.json();
+
+
+      console.log(
+        "Loaded Assessment:",
+        data
       );
 
-    if (
-      structureData
-    ) {
-      try {
-        const parsedStructure =
-          JSON.parse(
-            structureData,
-          ) as AssessmentStructure;
 
-        setStructure(
-          parsedStructure,
+      setAssessment({
+
+        id:data.id,
+
+        title:data.title,
+
+        code:data.code,
+
+        plannedQuestions:
+          data.plannedQuestions,
+
+        totalMarks:
+          data.totalMarks,
+
+        durationMinutes:
+          data.durationMinutes,
+
+        technology:
+          data.technology,
+
+        difficulty:
+          data.difficulty
+
+      });
+
+
+
+      const questionResponse =
+        await fetch(
+          `http://localhost:3001/questions/assessment/${assessmentId}`
         );
 
-        if (
-          parsedStructure.mode ===
-            "WITH_SECTIONS" &&
-          parsedStructure.sections
-            .length > 0
-        ) {
-          setSelectedSectionId(
-            parsedStructure
-              .sections[0].id,
-          );
-        }
-      } catch {
-        console.error(
-          "Unable to load assessment structure.",
+
+      if(questionResponse.ok){
+
+        const questionList =
+          await questionResponse.json();
+
+
+        console.log(
+          "Loaded Questions:",
+          questionList
         );
-      }
-    }
 
-    const questionData =
-      sessionStorage.getItem(
-        `assessmentQuestions:${assessmentId}`,
-      );
 
-    if (
-      questionData
-    ) {
-      try {
         setQuestions(
-          JSON.parse(
-            questionData,
-          ),
+          questionList
         );
-      } catch {
-        console.error(
-          "Unable to load assessment questions.",
-        );
+
       }
+
+
     }
-  }, [
-    assessmentId,
-  ]);
+    catch(error){
+
+      console.error(
+        "Loading failed:",
+        error
+      );
+
+    }
+
+  }
+
+
+  loadData();
+
+
+},[
+  assessmentId
+]);
 
   /*
   ============================================================
@@ -255,77 +237,22 @@ export default function AssessmentQuestionsPage() {
       ],
     );
 
-  const selectedSection =
-    structure?.sections.find(
-      (section) =>
-        section.id ===
-        selectedSectionId,
-    );
-
   const visibleQuestions =
     useMemo(
-      () => {
-        if (
-          structure?.mode ===
-          "NO_SECTIONS"
-        ) {
-          return [
-            ...questions,
-          ]
-            .filter(
-              (question) =>
-                question.sectionId ===
-                null,
-            )
-            .sort(
-              (
-                a,
-                b,
-              ) =>
-                a.sequence -
-                b.sequence,
-            );
-        }
-
-        return questions
-          .filter(
-            (question) =>
-              question.sectionId ===
-              selectedSectionId,
-          )
-          .sort(
-            (
-              a,
-              b,
-            ) =>
-              a.sequence -
-              b.sequence,
-          );
-      },
-      [
-        questions,
-        structure,
-        selectedSectionId,
-      ],
+      () =>
+        [...questions].sort(
+          (a, b) =>
+            a.sequence -
+            b.sequence,
+        ),
+      [questions],
     );
 
   const selectedPlannedQuestions =
-    structure?.mode ===
-    "WITH_SECTIONS"
-      ? selectedSection
-          ?.plannedQuestions ??
-        0
-      : assessment
-          ?.plannedQuestions ??
-        0;
+    assessment?.plannedQuestions ?? 0;
 
   const selectedPlannedMarks =
-    structure?.mode ===
-    "WITH_SECTIONS"
-      ? selectedSection?.marks ??
-        0
-      : assessment?.totalMarks ??
-        0;
+    assessment?.totalMarks ?? 0;
 
   const selectedConfiguredMarks =
     visibleQuestions.reduce(
@@ -355,9 +282,9 @@ export default function AssessmentQuestionsPage() {
       ),
     );
 
-    setSaved(
-      true,
-    );
+    // setSaved(
+    //   true,
+    // );
   }
 
   /*
@@ -401,54 +328,6 @@ export default function AssessmentQuestionsPage() {
             ?.totalMarks ??
           0
         } marks. Currently ${totalConfiguredMarks} marks are configured.`,
-      );
-    }
-
-    if (
-      structure?.mode ===
-      "WITH_SECTIONS"
-    ) {
-      structure.sections.forEach(
-        (section) => {
-          const sectionQuestions =
-            questions.filter(
-              (question) =>
-                question.sectionId ===
-                section.id,
-            );
-
-          const sectionMarks =
-            sectionQuestions.reduce(
-              (
-                total,
-                question,
-              ) =>
-                total +
-                Number(
-                  question.marks ||
-                    0,
-                ),
-              0,
-            );
-
-          if (
-            sectionQuestions.length !==
-            section.plannedQuestions
-          ) {
-            validationErrors.push(
-              `${section.name}: ${sectionQuestions.length}/${section.plannedQuestions} questions configured.`,
-            );
-          }
-
-          if (
-            sectionMarks !==
-            section.marks
-          ) {
-            validationErrors.push(
-              `${section.name}: ${sectionMarks}/${section.marks} marks configured.`,
-            );
-          }
-        },
       );
     }
 
@@ -520,70 +399,34 @@ export default function AssessmentQuestionsPage() {
       false,
     );
 
-    const query =
-      new URLSearchParams();
-
-    if (
-      structure?.mode ===
-        "WITH_SECTIONS" &&
-      selectedSectionId
-    ) {
-      query.set(
-        "sectionId",
-        selectedSectionId,
-      );
-    }
-
-    switch (
-      type
-    ) {
+    switch (type) {
       case "CODING":
         router.push(
-          `/assessments/${assessmentId}/questions/create/coding${
-            query.toString()
-              ? `?${query.toString()}`
-              : ""
-          }`,
+          `/assessments/${assessmentId}/questions/create/coding`,
         );
         return;
 
       case "MCQ":
         router.push(
-          `/assessments/${assessmentId}/questions/create/mcq${
-            query.toString()
-              ? `?${query.toString()}`
-              : ""
-          }`,
+          `/assessments/${assessmentId}/questions/create/mcq`,
         );
         return;
 
       case "DEBUGGING":
         router.push(
-          `/assessments/${assessmentId}/questions/create/debugging${
-            query.toString()
-              ? `?${query.toString()}`
-              : ""
-          }`,
+          `/assessments/${assessmentId}/questions/create/debugging`,
         );
         return;
 
       case "OUTPUT_PREDICTION":
         router.push(
-          `/assessments/${assessmentId}/questions/create/output-prediction${
-            query.toString()
-              ? `?${query.toString()}`
-              : ""
-          }`,
+          `/assessments/${assessmentId}/questions/create/output-prediction`,
         );
         return;
 
       case "CODE_REVIEW":
         router.push(
-          `/assessments/${assessmentId}/questions/create/code-review${
-            query.toString()
-              ? `?${query.toString()}`
-              : ""
-          }`,
+          `/assessments/${assessmentId}/questions/create/code-review`,
         );
         return;
     }
@@ -602,11 +445,8 @@ export default function AssessmentQuestionsPage() {
       false,
     );
 
-    const query =
-      buildSectionQuery();
-
     router.push(
-      `/assessments/${assessmentId}/questions/question-bank${query}`,
+      `/assessments/${assessmentId}/questions/question-bank`,
     );
   }
 
@@ -617,11 +457,8 @@ export default function AssessmentQuestionsPage() {
       false,
     );
 
-    const query =
-      buildSectionQuery();
-
     router.push(
-      `/assessments/${assessmentId}/questions/import${query}`,
+      `/assessments/${assessmentId}/questions/import`,
     );
   }
 
@@ -632,26 +469,9 @@ export default function AssessmentQuestionsPage() {
       false,
     );
 
-    const query =
-      buildSectionQuery();
-
     router.push(
-      `/assessments/${assessmentId}/questions/ai-generate${query}`,
+      `/assessments/${assessmentId}/questions/ai-generate`,
     );
-  }
-
-  function buildSectionQuery() {
-    if (
-      structure?.mode ===
-        "WITH_SECTIONS" &&
-      selectedSectionId
-    ) {
-      return `?sectionId=${encodeURIComponent(
-        selectedSectionId,
-      )}`;
-    }
-
-    return "";
   }
 
   /*
@@ -678,17 +498,7 @@ export default function AssessmentQuestionsPage() {
       "mode",
       "edit",
     );
-
-    if (
-      question.sectionId
-    ) {
-      query.set(
-        "sectionId",
-        question.sectionId,
-      );
-    }
-
-    const suffix =
+const suffix =
       `?${query.toString()}`;
 
     switch (
@@ -761,9 +571,9 @@ export default function AssessmentQuestionsPage() {
         ),
     );
 
-    setSaved(
-      false,
-    );
+    // setSaved(
+    //   false,
+    // );
 
     setErrors(
       [],
@@ -858,9 +668,9 @@ export default function AssessmentQuestionsPage() {
       },
     );
 
-    setSaved(
-      false,
-    );
+    // setSaved(
+    //   false,
+    // );
 
     setErrors(
       [],
@@ -921,9 +731,9 @@ export default function AssessmentQuestionsPage() {
       ],
     );
 
-    setSaved(
-      false,
-    );
+    // setSaved(
+    //   false,
+    // );
 
     setErrors(
       [],
@@ -1031,9 +841,9 @@ export default function AssessmentQuestionsPage() {
         ),
     );
 
-    setSaved(
-      false,
-    );
+    // setSaved(
+    //   false,
+    // );
   }
 
   /*
@@ -1042,9 +852,9 @@ export default function AssessmentQuestionsPage() {
   ============================================================
   */
 
+  
   if (
-    !assessment ||
-    !structure
+ !assessment
   ) {
     return (
       <main className="questions-page">
@@ -1105,7 +915,7 @@ export default function AssessmentQuestionsPage() {
               className="back-link"
               onClick={() =>
                 router.push(
-                  `/assessments/${assessmentId}/create`,
+                  `/assessments/${assessmentId}/edit`,
                 )
               }
             >
@@ -1217,137 +1027,18 @@ export default function AssessmentQuestionsPage() {
 
         <div className="builder-layout">
 
-          {/* SECTION NAVIGATION */}
-
-          {structure.mode ===
-            "WITH_SECTIONS" && (
-
-            <aside className="builder-sidebar">
-
-              <div className="sidebar-title">
-
-                <span>
-                  SECTIONS
-                </span>
-
-              </div>
-
-              {structure.sections.map(
-                (
-                  section,
-                ) => {
-
-                  const sectionQuestions =
-                    questions.filter(
-                      (question) =>
-                        question.sectionId ===
-                        section.id,
-                    );
-
-                  const sectionMarks =
-                    sectionQuestions.reduce(
-                      (
-                        total,
-                        question,
-                      ) =>
-                        total +
-                        question.marks,
-                      0,
-                    );
-
-                  return (
-                    <button
-                      key={
-                        section.id
-                      }
-                      type="button"
-                      className={`section-nav ${
-                        selectedSectionId ===
-                        section.id
-                          ? "active"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setSelectedSectionId(
-                          section.id,
-                        )
-                      }
-                    >
-
-                      <div>
-
-                        <strong>
-                          {
-                            section.name
-                          }
-                        </strong>
-
-                        <span>
-                          {
-                            sectionQuestions.length
-                          }
-                          {" / "}
-                          {
-                            section.plannedQuestions
-                          }
-                          {" questions"}
-                        </span>
-
-                      </div>
-
-                      <small>
-                        {
-                          sectionMarks
-                        }
-                        {" / "}
-                        {
-                          section.marks
-                        }
-                        {" marks"}
-                      </small>
-
-                    </button>
-                  );
-                },
-              )}
-
-            </aside>
-
-          )}
-
-          {/* WORKSPACE */}
-
-          <section
-            className={`workspace-card ${
-              structure.mode ===
-              "NO_SECTIONS"
-                ? "workspace-full"
-                : ""
-            }`}
-          >
+          <section className="workspace-card workspace-full">
 
             <div className="workspace-header">
 
               <div>
 
                 <span className="workspace-label">
-                  {
-                    structure.mode ===
-                    "WITH_SECTIONS"
-                      ? "CURRENT SECTION"
-                      : "QUESTION SET"
-                  }
+                  QUESTION SET
                 </span>
 
                 <h2>
-                  {
-                    structure.mode ===
-                    "WITH_SECTIONS"
-                      ? selectedSection
-                          ?.name ??
-                        "Section"
-                      : "Assessment Questions"
-                  }
+                  Assessment Questions
                 </h2>
 
                 <p>
@@ -1675,49 +1366,35 @@ export default function AssessmentQuestionsPage() {
 
         <footer className="sticky-footer">
 
-          <button
-            type="button"
-            className="secondary-button"
-            onClick={() =>
-              router.push(
-                `/assessments/${assessmentId}/structure`,
-              )
-            }
-          >
-            ← Back
-          </button>
+  <button
+    type="button"
+    className="secondary-button"
+    onClick={() =>
+      router.push(
+        `/assessments/${assessmentId}/edit`,
+      )
+    }
+  >
+    ← Back
+  </button>
 
-          <div className="footer-right">
 
-            {saved && (
-              <span className="saved-text">
-                Draft saved
-              </span>
-            )}
+  <div className="footer-right">
 
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={
-                saveQuestions
-              }
-            >
-              Save Draft
-            </button>
+    <button
+      type="button"
+      className="primary-button"
+      onClick={
+        saveAndContinue
+      }
+    >
+      Continue →
+    </button>
 
-            <button
-              type="button"
-              className="primary-button"
-              onClick={
-                saveAndContinue
-              }
-            >
-              Continue →
-            </button>
+  </div>
 
-          </div>
 
-        </footer>
+</footer>
 
       </div>
 

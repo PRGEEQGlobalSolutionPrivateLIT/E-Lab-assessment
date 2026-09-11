@@ -62,7 +62,7 @@ interface AssessmentQuestion {
 interface ScoringRules {
   assessmentId?: string;
 
-  totalMarks: number;
+  totalMarks?: number;
 
   passPercentage: number;
 
@@ -234,94 +234,143 @@ export default function PublishPage() {
      ============================================================ */
 
   useEffect(() => {
-    try {
-      /* Assessment */
 
-      const assessmentRaw =
-        sessionStorage.getItem(
-          "assessmentDraft",
-        );
+    async function loadPublishData() {
 
-      if (assessmentRaw) {
-        setAssessment(
-          JSON.parse(
-            assessmentRaw,
-          ),
-        );
-      }
+      try {
 
-      /* Questions */
+        const API_URL =
+          process.env.NEXT_PUBLIC_API_URL ??
+          "http://localhost:3001";
 
-      const questionsRaw =
-        sessionStorage.getItem(
-          `assessmentQuestions:${assessmentId}`,
-        );
 
-      if (questionsRaw) {
-        const parsed =
-          JSON.parse(
-            questionsRaw,
-          );
+        const [
+          assessmentResponse,
+          questionsResponse,
+          scoringResponse,
+          deliveryResponse,
+          publicationResponse,
+        ] =
+          await Promise.all([
+            fetch(
+              `${API_URL}/assessment/${assessmentId}`,
+            ),
 
-        if (Array.isArray(parsed)) {
-          setQuestions(
-            parsed,
+            fetch(
+              `${API_URL}/questions/assessment/${assessmentId}`,
+            ),
+
+            fetch(
+              `${API_URL}/scoring/${assessmentId}`,
+            ),
+
+            fetch(
+              `${API_URL}/delivery/${assessmentId}`,
+            ),
+
+            fetch(
+              `${API_URL}/assessment/${assessmentId}/publication`,
+            ),
+          ]);
+
+
+        if (assessmentResponse.ok) {
+          setAssessment(
+            await assessmentResponse.json(),
           );
         }
+
+
+        if (questionsResponse.ok) {
+
+          const questionData =
+            await questionsResponse.json();
+
+          setQuestions(
+            Array.isArray(questionData)
+              ? questionData
+              : [],
+          );
+        }
+
+
+        if (scoringResponse.ok) {
+
+          setScoring(
+            await scoringResponse.json(),
+          );
+        }
+
+
+        if (deliveryResponse.ok) {
+
+          const deliveryData =
+            await deliveryResponse.json();
+
+
+          setDelivery({
+
+            ...(deliveryData.delivery ?? {}),
+
+            ...(deliveryData.security ?? {}),
+
+
+            startDate:
+              deliveryData.delivery?.startsAt
+                ? deliveryData.delivery.startsAt.substring(0,10)
+                : "",
+
+            startTime:
+              deliveryData.delivery?.startsAt
+                ? deliveryData.delivery.startsAt.substring(11,16)
+                : "",
+
+            endDate:
+              deliveryData.delivery?.endsAt
+                ? deliveryData.delivery.endsAt.substring(0,10)
+                : "",
+
+            endTime:
+              deliveryData.delivery?.endsAt
+                ? deliveryData.delivery.endsAt.substring(11,16)
+                : "",
+
+          });
+
+        }
+
+
+        if (publicationResponse.ok) {
+
+          setPublication(
+            await publicationResponse.json(),
+          );
+
+        }
+
+
+      }
+      catch(error) {
+
+        console.error(
+          "PUBLISH LOAD ERROR:",
+          error,
+        );
+
+      }
+      finally {
+
+        setLoaded(true);
+
       }
 
-      /* Scoring */
-
-      const scoringRaw =
-        sessionStorage.getItem(
-          `assessmentScoring:${assessmentId}`,
-        );
-
-      if (scoringRaw) {
-        setScoring(
-          JSON.parse(
-            scoringRaw,
-          ),
-        );
-      }
-
-      /* Delivery */
-
-      const deliveryRaw =
-        sessionStorage.getItem(
-          `assessmentDelivery:${assessmentId}`,
-        );
-
-      if (deliveryRaw) {
-        setDelivery(
-          JSON.parse(
-            deliveryRaw,
-          ),
-        );
-      }
-
-      /* Publication */
-
-      const publicationRaw =
-        sessionStorage.getItem(
-          `assessmentPublication:${assessmentId}`,
-        );
-
-      if (publicationRaw) {
-        setPublication(
-          JSON.parse(
-            publicationRaw,
-          ),
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Unable to load publish data.",
-        error,
-      );
-    } finally {
-      setLoaded(true);
     }
+
+
+    if (assessmentId) {
+      loadPublishData();
+    }
+
   }, [assessmentId]);
 
   /* ============================================================
@@ -382,11 +431,7 @@ export default function PublishPage() {
               scoring.passPercentage <=
                 100 &&
               scoring.maximumAttempts >=
-                1 &&
-              Number(
-                scoring.totalMarks,
-              ) ===
-                totalQuestionMarks,
+                1,
           ),
 
         delivery:
@@ -588,7 +633,7 @@ export default function PublishPage() {
      PUBLISH
      ============================================================ */
 
-  function publishAssessment() {
+  async function publishAssessment() {
     if (
       !readiness.allReady ||
       !confirmed ||
@@ -619,35 +664,43 @@ export default function PublishPage() {
           now,
       };
 
-      sessionStorage.setItem(
-        `assessmentPublication:${assessmentId}`,
-        JSON.stringify(
-          payload,
-        ),
-      );
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL ??
+        "http://localhost:3001";
 
-      /*
-       * Temporary frontend prototype status.
-       *
-       * Later this must become a backend API call,
-       * protected by:
-       *
-       * assessment:publish
-       *
-       * The backend should verify:
-       *
-       * - tenant
-       * - permissions
-       * - assessment state
-       * - questions
-       * - scoring
-       * - delivery
-       * - assignment
-       * - audit information
-       */
+
+      const response =
+        await fetch(
+          `${API_URL}/assessment/${assessmentId}/publish`,
+          {
+            method:"PATCH",
+
+            headers:{
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify(payload),
+          },
+        );
+
+
+      if(!response.ok){
+
+        throw new Error(
+          await response.text(),
+        );
+
+      }
+
+
+      const publishedData =
+        await response.json();
+
 
       setPublication(
-        payload,
+        publishedData,
       );
 
       setMessage(

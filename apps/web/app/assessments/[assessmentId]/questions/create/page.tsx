@@ -318,160 +318,201 @@ export default function CreateQuestionPage() {
     );
   }
 
-  function saveDraft() {
-    const draft = {
-      id:
-        crypto.randomUUID(),
-      assessmentId,
-      sectionId,
-      type: "CODING",
-      ...form,
-      testCases,
-      status: "DRAFT",
-      updatedAt:
-        new Date().toISOString(),
-    };
+  // function saveDraft() {
+  //   const draft = {
+  //     id:
+  //       crypto.randomUUID(),
+  //     assessmentId,
+  //     sectionId,
+  //     type: "CODING",
+  //     ...form,
+  //     testCases,
+  //     status: "DRAFT",
+  //     updatedAt:
+  //       new Date().toISOString(),
+  //   };
 
-    sessionStorage.setItem(
-      `codingQuestionDraft:${assessmentId}`,
-      JSON.stringify(
-        draft,
-      ),
-    );
+  //   sessionStorage.setItem(
+  //     `codingQuestionDraft:${assessmentId}`,
+  //     JSON.stringify(
+  //       draft,
+  //     ),
+  //   );
 
-    alert(
-      "Question draft saved.",
-    );
-  }
+  //   alert(
+  //     "Question draft saved.",
+  //   );
+  // }
 
-  function saveQuestion() {
-    if (
-      !validateQuestion()
-    ) {
+  async function saveQuestion() {
+
+    if (!validateQuestion()) {
       return;
     }
 
-    const questionId =
-      crypto.randomUUID();
 
-    const question = {
-      id: questionId,
-      type: "CODING",
-      ...form,
-      testCases,
-      status: "DRAFT",
-      createdAt:
-        new Date().toISOString(),
-      updatedAt:
-        new Date().toISOString(),
-    };
+    try {
 
-    /*
-     * Save canonical question.
-     * Temporary browser persistence.
-     */
-    const questionBankKey =
-      "questionBank";
+      const payload = {
 
-    const existingBank =
-      sessionStorage.getItem(
-        questionBankKey,
-      );
+        assessmentId,
 
-    const questionBank =
-      existingBank
-        ? JSON.parse(
-            existingBank,
-          )
-        : [];
+        sectionId,
 
-    sessionStorage.setItem(
-      questionBankKey,
-      JSON.stringify([
-        ...questionBank,
-        question,
-      ]),
-    );
+        organizationId:
+          "DEFAULT_ORGANIZATION",
 
-    /*
-     * Attach question to current assessment.
-     */
-    const assessmentQuestionKey =
-      `assessmentQuestions:${assessmentId}`;
+        createdByUserId:
+          "DEFAULT_USER",
 
-    const existingAssessmentQuestions =
-      sessionStorage.getItem(
-        assessmentQuestionKey,
-      );
 
-    const assessmentQuestions =
-      existingAssessmentQuestions
-        ? JSON.parse(
-            existingAssessmentQuestions,
-          )
-        : [];
+        form: {
 
-    const sectionQuestionCount =
-      assessmentQuestions.filter(
-        (
-          item: {
-            sectionId:
-              string | null;
+          title: form.title,
+
+          code: form.code,
+
+          language: form.language,
+
+          difficulty: form.difficulty,
+
+          marks: form.marks,
+
+          problemStatement:
+            form.problemStatement,
+
+          inputFormat:
+            form.inputFormat,
+
+          outputFormat:
+            form.outputFormat,
+
+          constraints:
+            form.constraints,
+
+          starterCode:
+            form.starterCode,
+
+          referenceSolution:
+            form.referenceSolution,
+
+          compiler:
+            form.compiler,
+
+          languageStandard:
+            form.languageStandard,
+
+          timeLimitSeconds:
+            form.timeLimitSeconds,
+
+          memoryLimitMb:
+            form.memoryLimitMb,
+
+          aiPolicy:
+            form.aiPolicy,
+
+        },
+
+
+        testCases:
+          testCases.map(
+            (tc, index) => ({
+
+              name:
+                tc.name,
+
+              type:
+                tc.type,
+
+              input:
+                tc.input,
+
+              expectedOutput:
+                tc.expectedOutput,
+
+              marks:
+                tc.marks,
+
+              sequence:
+                index + 1,
+
+              active:
+                tc.active,
+
+            }),
+          ),
+
+      };
+
+
+      const response =
+        await fetch(
+          "http://localhost:3001/questions/coding",
+          {
+
+            method:
+              "POST",
+
+            headers: {
+
+              "Content-Type":
+                "application/json",
+
+            },
+
+            body:
+              JSON.stringify(payload),
+
           },
-        ) =>
-          item.sectionId ===
-          sectionId,
-      ).length;
+        );
 
-    const assessmentQuestion = {
-      id:
-        crypto.randomUUID(),
 
-      assessmentId,
+      if (!response.ok) {
 
-      questionId,
+        const message =
+          await response.text();
 
-      sectionId:
-        sectionId ?? null,
+        console.error(
+          message,
+        );
 
-      sequence:
-        sectionQuestionCount + 1,
+        throw new Error(
+          "Question creation failed",
+        );
 
-      title:
-        form.title,
+      }
 
-      type: "CODING",
 
-      technology:
-        form.language,
+      const result =
+        await response.json();
 
-      difficulty:
-        form.difficulty,
 
-      marks:
-        form.marks,
+      console.log(
+        "Question saved:",
+        result,
+      );
 
-      mandatory: true,
 
-      negativeMarks: 0,
+      router.push(
+        `/assessments/${assessmentId}/questions`,
+      );
 
-      status: "DRAFT",
 
-      source: "NEW",
-    };
+    }
+    catch(error) {
 
-    sessionStorage.setItem(
-      assessmentQuestionKey,
-      JSON.stringify([
-        ...assessmentQuestions,
-        assessmentQuestion,
-      ]),
-    );
+      console.error(
+        error,
+      );
 
-    router.push(
-      `/assessments/${assessmentId}/questions`,
-    );
+      alert(
+        "Unable to save question",
+      );
+
+    }
+
   }
+
 
   return (
     <main className="create-question-page">
@@ -1601,7 +1642,7 @@ export default function CreateQuestionPage() {
 
           <div>
 
-            <button
+            {/* <button
               type="button"
               className="secondary-button"
               onClick={
@@ -1609,7 +1650,7 @@ export default function CreateQuestionPage() {
               }
             >
               Save Draft
-            </button>
+            </button> */}
 
             <button
               type="button"

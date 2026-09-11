@@ -1,0 +1,45 @@
+model AssessmentDraft {
+
+  id String @id @default(uuid())
+
+  organizationId String
+
+  title String?
+  code String?
+
+  description String?
+  instructions String?
+
+  assessmentType String?
+  purpose String?
+
+  technology String?
+  difficulty String?
+
+  plannedQuestions Int @default(0)
+  totalMarks Int @default(0)
+  durationMinutes Int @default(0)
+
+  version String @default("1.0")
+
+  tags String?
+
+  currentStep Int @default(1)
+  status String @default("DRAFT")
+
+  structureData Json?
+  questionsData Json?
+  scoringData Json?
+  rulesData Json?
+  securityData Json?
+  scheduleData Json?
+  assignmentData Json?
+
+  createdByUserId String
+  updatedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("assessment_draft")
+}
