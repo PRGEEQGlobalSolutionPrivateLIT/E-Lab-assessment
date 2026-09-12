@@ -5,6 +5,10 @@ import Editor from "@monaco-editor/react";
 
 import "./c-practice.css";
 
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:3001";
+
 const DEFAULT_CODE = `#include <stdio.h>
 
 int main(void)
@@ -22,6 +26,7 @@ int main(void)
 
 interface RunResponse {
   executionId: string;
+
   language: string;
 
   status:
@@ -31,8 +36,11 @@ interface RunResponse {
     | "TIMEOUT";
 
   stdout: string;
+
   stderr: string;
+
   exitCode: number | null;
+
   executionTimeMs: number;
 }
 
@@ -59,17 +67,23 @@ export default function CPracticePage() {
   const [isRunning, setIsRunning] =
     useState(false);
 
+  /* ============================================================
+     RUN CODE
+     ============================================================ */
+
   async function runCode() {
     try {
       setIsRunning(true);
 
       setStatus("RUNNING");
+
       setOutput("");
+
       setExecutionTime(null);
 
       const response =
         await fetch(
-          "http://localhost:3001/execution/run",
+          `${API_URL}/execution/run`,
           {
             method: "POST",
 
@@ -80,7 +94,9 @@ export default function CPracticePage() {
 
             body: JSON.stringify({
               language: "c",
+
               code,
+
               input,
             }),
           },
@@ -95,7 +111,9 @@ export default function CPracticePage() {
       const result: RunResponse =
         await response.json();
 
-      setStatus(result.status);
+      setStatus(
+        result.status,
+      );
 
       setExecutionTime(
         result.executionTimeMs,
@@ -117,7 +135,10 @@ export default function CPracticePage() {
         );
       }
     } catch (error) {
-      console.error(error);
+      console.error(
+        "C EXECUTION ERROR:",
+        error,
+      );
 
       setStatus("ERROR");
 
@@ -129,25 +150,47 @@ export default function CPracticePage() {
     }
   }
 
+  /* ============================================================
+     RESET
+     ============================================================ */
+
   function resetCode() {
     setCode(DEFAULT_CODE);
+
     setInput("10 20");
+
     setOutput("");
+
     setStatus("");
+
     setExecutionTime(null);
   }
 
-  const statusClass =
-    status
-      ? `status-${status.toLowerCase()}`
-      : "";
+  /* ============================================================
+     STATUS CLASS
+     ============================================================ */
+
+  const statusClass = status
+    ? `status-${status.toLowerCase()}`
+    : "";
+
+  /* ============================================================
+     UI
+     ============================================================ */
 
   return (
     <main className="c-practice-page">
+
       <div className="c-practice-container">
 
+        {/* ======================================================
+            HEADER
+        ====================================================== */}
+
         <header className="c-practice-header">
+
           <div className="c-header-left">
+
             <h1>
               C Programming Practice
             </h1>
@@ -158,14 +201,24 @@ export default function CPracticePage() {
               eLabs secure coding
               environment.
             </p>
+
           </div>
 
           <div className="c-language-badge">
             C · GCC
           </div>
+
         </header>
 
+        {/* ======================================================
+            WORKSPACE
+        ====================================================== */}
+
         <div className="c-workspace">
+
+          {/* ====================================================
+              PROBLEM PANEL
+          ==================================================== */}
 
           <aside className="neo-card problem-panel">
 
@@ -184,8 +237,13 @@ export default function CPracticePage() {
               their sum.
             </p>
 
+            {/* INPUT */}
+
             <div className="problem-section">
-              <h3>Input</h3>
+
+              <h3>
+                Input
+              </h3>
 
               <p>
                 Two space-separated
@@ -195,29 +253,50 @@ export default function CPracticePage() {
               <div className="example-box">
                 10 20
               </div>
+
             </div>
 
+            {/* EXPECTED OUTPUT */}
+
             <div className="problem-section">
-              <h3>Expected Output</h3>
+
+              <h3>
+                Expected Output
+              </h3>
 
               <div className="example-box">
                 30
               </div>
+
             </div>
 
+            {/* CONSTRAINTS */}
+
             <div className="problem-section">
-              <h3>Constraints</h3>
+
+              <h3>
+                Constraints
+              </h3>
 
               <p>
                 Read values using standard
                 input and print only the
                 required result.
               </p>
+
             </div>
 
           </aside>
 
+          {/* ====================================================
+              EDITOR COLUMN
+          ==================================================== */}
+
           <section className="editor-column">
+
+            {/* ==================================================
+                CODE EDITOR
+            ================================================== */}
 
             <div className="neo-card editor-card">
 
@@ -268,7 +347,12 @@ export default function CPracticePage() {
                 />
 
               </div>
+
             </div>
+
+            {/* ==================================================
+                INPUT
+            ================================================== */}
 
             <div className="neo-card input-card">
 
@@ -291,13 +375,21 @@ export default function CPracticePage() {
                 placeholder="Enter program input..."
               />
 
+              {/* =================================================
+                  ACTION BAR
+              ================================================= */}
+
               <div className="action-bar">
 
                 <button
                   type="button"
                   className="neo-button run-button"
-                  onClick={runCode}
-                  disabled={isRunning}
+                  onClick={
+                    runCode
+                  }
+                  disabled={
+                    isRunning
+                  }
                 >
                   {isRunning
                     ? "Running..."
@@ -308,6 +400,7 @@ export default function CPracticePage() {
                   type="button"
                   className="neo-button test-button"
                   disabled
+                  title="Test runner will be enabled when test-case execution is implemented."
                 >
                   ✓ Run Tests
                 </button>
@@ -315,8 +408,12 @@ export default function CPracticePage() {
                 <button
                   type="button"
                   className="neo-button reset-button"
-                  onClick={resetCode}
-                  disabled={isRunning}
+                  onClick={
+                    resetCode
+                  }
+                  disabled={
+                    isRunning
+                  }
                 >
                   ↻ Reset
                 </button>
@@ -325,11 +422,17 @@ export default function CPracticePage() {
 
             </div>
 
+            {/* ==================================================
+                OUTPUT CONSOLE
+            ================================================== */}
+
             <div className="neo-card output-card">
 
               <div className="output-header">
 
-                <h3>Output Console</h3>
+                <h3>
+                  Output Console
+                </h3>
 
                 {status && (
                   <span
@@ -346,10 +449,16 @@ export default function CPracticePage() {
                   "Run your C program to see the output here."}
               </pre>
 
-              {executionTime !== null && (
+              {executionTime !==
+                null && (
                 <div className="execution-meta">
+
                   Execution time:{" "}
-                  {executionTime} ms
+                  {
+                    executionTime
+                  }{" "}
+                  ms
+
                 </div>
               )}
 
@@ -360,6 +469,7 @@ export default function CPracticePage() {
         </div>
 
       </div>
+
     </main>
   );
 }
