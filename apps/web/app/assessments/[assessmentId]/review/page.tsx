@@ -11,6 +11,8 @@ import {
   useRouter,
 } from "next/navigation";
 
+import { API_URL } from "@/src/lib/api/fetcher";
+
 import "./review.css";
 
 /* ============================================================
@@ -19,39 +21,24 @@ import "./review.css";
 
 interface AssessmentDraft {
   id?: string;
-
   title: string;
-
   code: string;
-
   totalMarks: number;
-
   plannedQuestions: number;
-
   durationMinutes: number;
 }
 
 interface AssessmentQuestion {
   id: string;
-
   questionId: string;
-
   assessmentId?: string;
-
   sectionId: string | null;
-
   sequence: number;
-
   title: string;
-
   type: string;
-
   technology: string;
-
   difficulty: string;
-
   marks: number;
-
   source:
     | "NEW"
     | "QUESTION_BANK"
@@ -61,27 +48,16 @@ interface AssessmentQuestion {
 
 interface ScoringRules {
   assessmentId?: string;
-
   totalMarks?: number;
-
   passPercentage: number;
-
   passMarks: number;
-
   maximumAttempts: number;
-
   negativeMarking: boolean;
-
   negativeMarkValue: number;
-
   partialMarking: boolean;
-
   allowBackNavigation: boolean;
-
   allowQuestionSkip: boolean;
-
   autoSubmitOnTimeout: boolean;
-
   updatedAt?: string;
 }
 
@@ -106,65 +82,39 @@ interface DeliverySettings {
   assessmentId?: string;
 
   /* Availability */
-
   startDate: string;
-
   startTime: string;
-
   endDate: string;
-
   endTime: string;
 
   /* Assignment */
-
   audienceType: AudienceType;
-
   batchOrGroup: string;
-
   selectedLearners: string;
 
   /* AI */
-
   aiPolicy: AiPolicy;
 
   /* Basic Security */
-
   fullscreenMode: boolean;
-
   tabSwitchDetection: boolean;
-
   copyPasteDetection: boolean;
-
   copyPasteRestriction: boolean;
-
   textSelectionDetection: boolean;
-
   textSelectionRestriction: boolean;
-
   autoSubmitOnViolation: boolean;
 
   /* Advanced Security */
-
   maximumTabSwitches: number;
-
   violationLimit: number;
-
   allowedIpAddresses: string;
-
   devicePolicy: DevicePolicy;
-
   cameraProctoring: boolean;
-
   microphoneMonitoring: boolean;
-
   identityVerification: boolean;
-
   blockBrowserExtensions: boolean;
-
   disableRightClick: boolean;
-
   preventPrinting: boolean;
-
   preventScreenshots: boolean;
 
   updatedAt?: string;
@@ -172,14 +122,11 @@ interface DeliverySettings {
 
 interface ValidationItem {
   id: string;
-
   label: string;
-
   status:
     | "PASS"
     | "ERROR"
     | "WARNING";
-
   message: string;
 }
 
@@ -189,7 +136,6 @@ interface ValidationItem {
 
 export default function ReviewPage() {
   const router = useRouter();
-
   const params = useParams();
 
   const assessmentId =
@@ -221,166 +167,331 @@ export default function ReviewPage() {
      ============================================================ */
 
   useEffect(() => {
-
     async function loadReviewData() {
-
       try {
-
-        const API_URL =
-          process.env.NEXT_PUBLIC_API_URL ??
-          "http://localhost:3001";
-
-
         console.log(
           "REVIEW LOAD:",
-          assessmentId
+          assessmentId,
         );
 
+        console.log(
+          "API URL:",
+          API_URL,
+        );
+
+        /* ======================================================
+           LOAD ASSESSMENT
+           ====================================================== */
 
         const assessmentResponse =
           await fetch(
-            `${API_URL}/assessment/${assessmentId}`
+            `${API_URL}/assessment/${assessmentId}`,
+            {
+              method: "GET",
+              cache: "no-store",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            },
           );
-
 
         if (!assessmentResponse.ok) {
+          const text =
+            await assessmentResponse.text();
+
+          let message =
+            "Assessment not found.";
+
+          try {
+            const parsed =
+              JSON.parse(text);
+
+            if (
+              Array.isArray(
+                parsed?.message,
+              )
+            ) {
+              message =
+                parsed.message.join(
+                  "; ",
+                );
+            } else if (
+              parsed?.message
+            ) {
+              message =
+                parsed.message;
+            } else if (
+              text.trim()
+            ) {
+              message = text;
+            }
+          } catch {
+            if (text.trim()) {
+              message = text;
+            }
+          }
+
           throw new Error(
-            "Assessment not found"
+            message,
           );
         }
-
 
         const assessmentData =
           await assessmentResponse.json();
 
+        /*
+         * Support:
+         *
+         * {
+         *   ...
+         * }
+         *
+         * OR
+         *
+         * {
+         *   data: {...}
+         * }
+         *
+         * OR
+         *
+         * {
+         *   assessment: {...}
+         * }
+         */
+
+        const normalizedAssessment =
+          assessmentData?.assessment ??
+          assessmentData?.data ??
+          assessmentData;
 
         setAssessment(
-          assessmentData
+          normalizedAssessment,
         );
 
-
+        /* ======================================================
+           LOAD QUESTIONS
+           ====================================================== */
 
         const questionResponse =
           await fetch(
-            `${API_URL}/questions/assessment/${assessmentId}`
+            `${API_URL}/questions/assessment/${assessmentId}`,
+            {
+              method: "GET",
+              cache: "no-store",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            },
           );
 
-
         if (questionResponse.ok) {
-
           const questionData =
             await questionResponse.json();
 
+          /*
+           * Support:
+           *
+           * []
+           *
+           * {
+           *   data: []
+           * }
+           *
+           * {
+           *   questions: []
+           * }
+           */
+
+          const rawQuestions =
+            Array.isArray(
+              questionData,
+            )
+              ? questionData
+              : Array.isArray(
+                  questionData?.data,
+                )
+              ? questionData.data
+              : Array.isArray(
+                  questionData?.questions,
+                )
+              ? questionData.questions
+              : [];
+
+          const sortedQuestions =
+            rawQuestions.sort(
+              (
+                a: AssessmentQuestion,
+                b: AssessmentQuestion,
+              ) =>
+                Number(
+                  a.sequence ?? 0,
+                ) -
+                Number(
+                  b.sequence ?? 0,
+                ),
+            );
 
           setQuestions(
-            Array.isArray(questionData)
-              ? questionData.sort(
-                  (
-                    a: AssessmentQuestion,
-                    b: AssessmentQuestion
-                  ) =>
-                    Number(a.sequence) -
-                    Number(b.sequence)
-                )
-              : []
+            sortedQuestions,
+          );
+        } else {
+          console.warn(
+            "Unable to load assessment questions.",
           );
 
+          setQuestions([]);
         }
 
-
+        /* ======================================================
+           LOAD SCORING
+           ====================================================== */
 
         const scoringResponse =
           await fetch(
-            `${API_URL}/scoring/${assessmentId}`
+            `${API_URL}/scoring/${assessmentId}`,
+            {
+              method: "GET",
+              cache: "no-store",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            },
           );
 
-
         if (scoringResponse.ok) {
-
           const scoringData =
             await scoringResponse.json();
 
+          /*
+           * Support:
+           *
+           * {
+           *   ...
+           * }
+           *
+           * OR
+           *
+           * {
+           *   scoring: {...}
+           * }
+           *
+           * OR
+           *
+           * {
+           *   data: {...}
+           * }
+           */
+
+          const normalizedScoring =
+            scoringData?.scoring ??
+            scoringData?.data ??
+            scoringData;
 
           setScoring(
-            scoringData
+            normalizedScoring,
+          );
+        } else {
+          console.warn(
+            "Scoring configuration not found.",
           );
 
+          setScoring(null);
         }
 
-
+        /* ======================================================
+           LOAD DELIVERY + SECURITY
+           ====================================================== */
 
         const deliveryResponse =
           await fetch(
-            `${API_URL}/delivery/${assessmentId}`
+            `${API_URL}/delivery/${assessmentId}`,
+            {
+              method: "GET",
+              cache: "no-store",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            },
           );
 
-
         if (deliveryResponse.ok) {
-
           const deliveryData =
             await deliveryResponse.json();
 
+          const deliveryConfig =
+            deliveryData?.delivery ??
+            {};
+
+          const securityConfig =
+            deliveryData?.security ??
+            {};
+
+          const startsAt =
+            deliveryConfig?.startsAt;
+
+          const endsAt =
+            deliveryConfig?.endsAt;
 
           setDelivery({
-
-            ...(deliveryData.delivery ?? {}),
-
-            ...(deliveryData.security ?? {}),
-
+            ...deliveryConfig,
+            ...securityConfig,
 
             startDate:
-              deliveryData.delivery?.startsAt
-                ? deliveryData.delivery.startsAt.substring(0, 10)
+              startsAt
+                ? startsAt.substring(
+                    0,
+                    10,
+                  )
                 : "",
-
 
             startTime:
-              deliveryData.delivery?.startsAt
-                ? deliveryData.delivery.startsAt.substring(11, 16)
+              startsAt
+                ? startsAt.substring(
+                    11,
+                    16,
+                  )
                 : "",
-
 
             endDate:
-              deliveryData.delivery?.endsAt
-                ? deliveryData.delivery.endsAt.substring(0, 10)
+              endsAt
+                ? endsAt.substring(
+                    0,
+                    10,
+                  )
                 : "",
-
 
             endTime:
-              deliveryData.delivery?.endsAt
-                ? deliveryData.delivery.endsAt.substring(11, 16)
+              endsAt
+                ? endsAt.substring(
+                    11,
+                    16,
+                  )
                 : "",
-
           });
+        } else {
+          console.warn(
+            "Delivery configuration not found.",
+          );
 
+          setDelivery(null);
         }
-
-
-      }
-      catch(error) {
-
+      } catch (error) {
         console.error(
           "REVIEW LOAD ERROR:",
-          error
+          error,
         );
-
-      }
-      finally {
-
+      } finally {
         setLoaded(true);
-
       }
-
     }
-
 
     if (assessmentId) {
-
       loadReviewData();
-
     }
-
-
   }, [assessmentId]);
 
   /* ============================================================
@@ -411,16 +522,14 @@ export default function ReviewPage() {
   const validationItems =
     useMemo<ValidationItem[]>(
       () => {
-        const items:
-          ValidationItem[] = [];
+        const items: ValidationItem[] =
+          [];
 
         /* ----------------------------------------------
            Assessment
         ---------------------------------------------- */
 
-        if (
-          !assessment
-        ) {
+        if (!assessment) {
           items.push({
             id: "assessment",
             label:
@@ -465,8 +574,7 @@ export default function ReviewPage() {
         ) {
           items.push({
             id: "questions",
-            label:
-              "Questions",
+            label: "Questions",
             status: "ERROR",
             message:
               "No questions have been added.",
@@ -549,8 +657,7 @@ export default function ReviewPage() {
               id: "pass-score",
               label:
                 "Pass Score",
-              status:
-                "ERROR",
+              status: "ERROR",
               message:
                 "Pass percentage must be between 0 and 100.",
             });
@@ -559,32 +666,17 @@ export default function ReviewPage() {
               id: "pass-score",
               label:
                 "Pass Score",
-              status:
-                "PASS",
+              status: "PASS",
               message:
                 `${scoring.passPercentage}% (${scoring.passMarks} marks) configured.`,
             });
           }
 
-          /*
-          =====================================================
-          SCORING TOTAL VALIDATION
-
-          Total marks are already validated against
-          assessment.totalMarks above.
-
-          Scoring configuration should validate rules only.
-          totalMarks is not mandatory in AssessmentScoringRule.
-          =====================================================
-          */
-
           items.push({
-            id:
-              "scoring-marks",
+            id: "scoring-marks",
             label:
               "Scoring Total",
-            status:
-              "PASS",
+            status: "PASS",
             message:
               `Scoring is aligned with ${totalQuestionMarks} configured question marks.`,
           });
@@ -597,8 +689,7 @@ export default function ReviewPage() {
               id: "attempts",
               label:
                 "Maximum Attempts",
-              status:
-                "ERROR",
+              status: "ERROR",
               message:
                 "At least one assessment attempt must be allowed.",
             });
@@ -612,8 +703,7 @@ export default function ReviewPage() {
         if (!delivery) {
           items.push({
             id: "delivery",
-            label:
-              "Delivery",
+            label: "Delivery",
             status: "ERROR",
             message:
               "Delivery settings are not configured.",
@@ -631,8 +721,7 @@ export default function ReviewPage() {
           !delivery.endTime
         ) {
           items.push({
-            id:
-              "availability",
+            id: "availability",
             label:
               "Availability",
             status: "ERROR",
@@ -660,23 +749,19 @@ export default function ReviewPage() {
             end <= start
           ) {
             items.push({
-              id:
-                "availability",
+              id: "availability",
               label:
                 "Availability",
-              status:
-                "ERROR",
+              status: "ERROR",
               message:
                 "Assessment availability window is invalid.",
             });
           } else {
             items.push({
-              id:
-                "availability",
+              id: "availability",
               label:
                 "Availability",
-              status:
-                "PASS",
+              status: "PASS",
               message:
                 "Assessment availability window is valid.",
             });
@@ -696,8 +781,7 @@ export default function ReviewPage() {
               id: "audience",
               label:
                 "Assignment",
-              status:
-                "PASS",
+              status: "PASS",
               message:
                 "Selected learners are configured.",
             });
@@ -706,8 +790,7 @@ export default function ReviewPage() {
               id: "audience",
               label:
                 "Assignment",
-              status:
-                "ERROR",
+              status: "ERROR",
               message:
                 "At least one learner must be selected.",
             });
@@ -725,8 +808,7 @@ export default function ReviewPage() {
               id: "audience",
               label:
                 "Assignment",
-              status:
-                "PASS",
+              status: "PASS",
               message:
                 "Assessment audience is configured.",
             });
@@ -735,8 +817,7 @@ export default function ReviewPage() {
               id: "audience",
               label:
                 "Assignment",
-              status:
-                "ERROR",
+              status: "ERROR",
               message:
                 "Select a batch or group.",
             });
@@ -764,8 +845,7 @@ export default function ReviewPage() {
             id: "security",
             label:
               "Security Rules",
-            status:
-              "ERROR",
+            status: "ERROR",
             message:
               "Configure a valid violation limit for automatic submission.",
           });
@@ -774,8 +854,7 @@ export default function ReviewPage() {
             id: "security",
             label:
               "Security Rules",
-            status:
-              "PASS",
+            status: "PASS",
             message:
               "Assessment security configuration is valid.",
           });
@@ -799,24 +878,19 @@ export default function ReviewPage() {
   const blockingErrors =
     validationItems.filter(
       (item) =>
-        item.status ===
-        "ERROR",
+        item.status === "ERROR",
     );
 
   const warnings =
     validationItems.filter(
       (item) =>
-        item.status ===
-        "WARNING",
+        item.status === "WARNING",
     );
 
   const isReady =
     loaded &&
-    Boolean(
-      assessment,
-    ) &&
-    blockingErrors.length ===
-      0;
+    Boolean(assessment) &&
+    blockingErrors.length === 0;
 
   /* ============================================================
      HELPERS
@@ -907,10 +981,7 @@ export default function ReviewPage() {
     date?: string,
     time?: string,
   ) {
-    if (
-      !date ||
-      !time
-    ) {
+    if (!date || !time) {
       return "Not configured";
     }
 
@@ -951,19 +1022,13 @@ export default function ReviewPage() {
   if (!loaded) {
     return (
       <main className="review-page">
-
         <div className="review-container">
-
           <div className="review-loading-card">
-
             <strong>
               Loading assessment review...
             </strong>
-
           </div>
-
         </div>
-
       </main>
     );
   }
@@ -975,11 +1040,8 @@ export default function ReviewPage() {
   if (!assessment) {
     return (
       <main className="review-page">
-
         <div className="review-container">
-
           <div className="missing-card">
-
             <h2>
               Assessment data not found
             </h2>
@@ -1001,11 +1063,8 @@ export default function ReviewPage() {
             >
               Return to Assessments
             </button>
-
           </div>
-
         </div>
-
       </main>
     );
   }
@@ -1016,7 +1075,6 @@ export default function ReviewPage() {
 
   return (
     <main className="review-page">
-
       <div className="review-container">
 
         {/* ====================================================
@@ -1024,9 +1082,7 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <header className="review-header">
-
           <div>
-
             <button
               type="button"
               className="back-link"
@@ -1053,11 +1109,9 @@ export default function ReviewPage() {
               security before
               publishing.
             </p>
-
           </div>
 
           <div className="assessment-chip">
-
             <span>
               {assessment.code}
             </span>
@@ -1069,9 +1123,7 @@ export default function ReviewPage() {
             <small>
               Draft
             </small>
-
           </div>
-
         </header>
 
         {/* ====================================================
@@ -1079,7 +1131,6 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <section className="assessment-stepper">
-
           <StepperItem
             number="1"
             label="Setup"
@@ -1114,7 +1165,6 @@ export default function ReviewPage() {
             number="6"
             label="Publish"
           />
-
         </section>
 
         {/* ====================================================
@@ -1128,7 +1178,6 @@ export default function ReviewPage() {
               : "not-ready"
           }`}
         >
-
           <div className="readiness-icon">
             {isReady
               ? "✓"
@@ -1136,7 +1185,6 @@ export default function ReviewPage() {
           </div>
 
           <div>
-
             <strong>
               {isReady
                 ? "Ready for publishing"
@@ -1153,9 +1201,7 @@ export default function ReviewPage() {
                       : "s"
                   } must be resolved before publishing.`}
             </p>
-
           </div>
-
         </section>
 
         {/* ====================================================
@@ -1163,7 +1209,6 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <section className="review-summary-strip">
-
           <SummaryItem
             label="Questions"
             value={`${questions.length} / ${assessment.plannedQuestions}`}
@@ -1196,7 +1241,6 @@ export default function ReviewPage() {
                 : "Not configured"
             }
           />
-
         </section>
 
         {/* ====================================================
@@ -1204,7 +1248,6 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <section className="review-card">
-
           <ReviewSectionHeader
             number="1"
             title="Assessment Setup"
@@ -1217,7 +1260,6 @@ export default function ReviewPage() {
           />
 
           <div className="review-detail-grid">
-
             <ReviewField
               label="Assessment Title"
               value={
@@ -1250,9 +1292,7 @@ export default function ReviewPage() {
               label="Duration"
               value={`${assessment.durationMinutes} minutes`}
             />
-
           </div>
-
         </section>
 
         {/* ====================================================
@@ -1260,7 +1300,6 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <section className="review-card">
-
           <ReviewSectionHeader
             number="2"
             title="Questions"
@@ -1272,20 +1311,12 @@ export default function ReviewPage() {
             }
           />
 
-          {questions.length >
-          0 ? (
-
+          {questions.length > 0 ? (
             <div className="review-table-wrapper">
-
               <table className="review-table">
-
                 <thead>
-
                   <tr>
-
-                    <th>
-                      #
-                    </th>
+                    <th>#</th>
 
                     <th>
                       Question
@@ -1306,39 +1337,31 @@ export default function ReviewPage() {
                     <th className="numeric-column">
                       Marks
                     </th>
-
                   </tr>
-
                 </thead>
 
                 <tbody>
-
                   {questions.map(
                     (
                       question,
                       index,
                     ) => (
-
                       <tr
                         key={
                           question.id
                         }
                       >
-
                         <td>
                           {question.sequence ||
-                            index +
-                              1}
+                            index + 1}
                         </td>
 
                         <td>
-
                           <strong className="question-title">
                             {
                               question.title
                             }
                           </strong>
-
                         </td>
 
                         <td>
@@ -1362,18 +1385,13 @@ export default function ReviewPage() {
                             question.marks
                           }
                         </td>
-
                       </tr>
-
                     ),
                   )}
-
                 </tbody>
 
                 <tfoot>
-
                   <tr>
-
                     <td
                       colSpan={5}
                     >
@@ -1385,25 +1403,15 @@ export default function ReviewPage() {
                         totalQuestionMarks
                       }
                     </td>
-
                   </tr>
-
                 </tfoot>
-
               </table>
-
             </div>
-
           ) : (
-
             <div className="empty-review-state">
-
               No questions configured.
-
             </div>
-
           )}
-
         </section>
 
         {/* ====================================================
@@ -1411,7 +1419,6 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <section className="review-card">
-
           <ReviewSectionHeader
             number="3"
             title="Scoring & Rules"
@@ -1424,9 +1431,7 @@ export default function ReviewPage() {
           />
 
           {scoring ? (
-
             <div className="review-detail-grid">
-
               <ReviewField
                 label="Pass Percentage"
                 value={`${scoring.passPercentage}%`}
@@ -1478,19 +1483,12 @@ export default function ReviewPage() {
                   scoring.autoSubmitOnTimeout,
                 )}
               />
-
             </div>
-
           ) : (
-
             <div className="empty-review-state">
-
               Scoring and rules are not configured.
-
             </div>
-
           )}
-
         </section>
 
         {/* ====================================================
@@ -1498,7 +1496,6 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <section className="review-card">
-
           <ReviewSectionHeader
             number="4"
             title="Delivery"
@@ -1511,9 +1508,7 @@ export default function ReviewPage() {
           />
 
           {delivery ? (
-
             <div className="review-detail-grid">
-
               <ReviewField
                 label="Available From"
                 value={formatDateTime(
@@ -1534,10 +1529,11 @@ export default function ReviewPage() {
                 label="Audience Type"
                 value={
                   delivery.audienceType
-                    .replaceAll(
-                      "_",
-                      " ",
-                    )
+                    ? delivery.audienceType.replaceAll(
+                        "_",
+                        " ",
+                      )
+                    : "Not configured"
                 }
               />
 
@@ -1559,19 +1555,12 @@ export default function ReviewPage() {
                   delivery.devicePolicy,
                 )}
               />
-
             </div>
-
           ) : (
-
             <div className="empty-review-state">
-
               Delivery settings are not configured.
-
             </div>
-
           )}
-
         </section>
 
         {/* ====================================================
@@ -1579,7 +1568,6 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <section className="review-card">
-
           <ReviewSectionHeader
             number="5"
             title="Security"
@@ -1592,10 +1580,8 @@ export default function ReviewPage() {
           />
 
           {delivery ? (
-
             <>
               <div className="security-review-grid">
-
                 <SecurityReviewItem
                   label="Fullscreen Mode"
                   enabled={
@@ -1693,11 +1679,9 @@ export default function ReviewPage() {
                     delivery.autoSubmitOnViolation
                   }
                 />
-
               </div>
 
               <div className="security-rule-summary">
-
                 <ReviewField
                   label="Maximum Tab Switches"
                   value={
@@ -1725,21 +1709,13 @@ export default function ReviewPage() {
                     "Any network"
                   }
                 />
-
               </div>
-
             </>
-
           ) : (
-
             <div className="empty-review-state">
-
               Security settings are not configured.
-
             </div>
-
           )}
-
         </section>
 
         {/* ====================================================
@@ -1747,15 +1723,12 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <section className="review-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               6
             </span>
 
             <div>
-
               <h2>
                 Validation
               </h2>
@@ -1765,25 +1738,19 @@ export default function ReviewPage() {
                 before continuing to
                 publish.
               </p>
-
             </div>
-
           </div>
 
           <div className="validation-list">
-
             {validationItems.map(
               (item) => (
-
                 <div
                   key={item.id}
                   className={`validation-item ${
                     item.status.toLowerCase()
                   }`}
                 >
-
                   <span className="validation-status-icon">
-
                     {item.status ===
                     "PASS"
                       ? "✓"
@@ -1791,11 +1758,9 @@ export default function ReviewPage() {
                           "WARNING"
                         ? "!"
                         : "×"}
-
                   </span>
 
                   <div>
-
                     <strong>
                       {item.label}
                     </strong>
@@ -1803,36 +1768,23 @@ export default function ReviewPage() {
                     <p>
                       {item.message}
                     </p>
-
                   </div>
-
                 </div>
-
               ),
             )}
-
           </div>
 
-          {warnings.length >
-            0 && (
-
+          {warnings.length > 0 && (
             <div className="review-warning-note">
-
-              {warnings.length}
-              {" "}
+              {warnings.length}{" "}
               warning
-              {warnings.length ===
-              1
+              {warnings.length === 1
                 ? ""
-                : "s"}
-              {" "}
+                : "s"}{" "}
               found. Warnings do not
               prevent publishing.
-
             </div>
-
           )}
-
         </section>
 
         {/* ====================================================
@@ -1840,9 +1792,7 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <section className="preview-card">
-
           <div>
-
             <span className="preview-label">
               LEARNER EXPERIENCE
             </span>
@@ -1857,7 +1807,6 @@ export default function ReviewPage() {
               current questions, rules
               and security configuration.
             </p>
-
           </div>
 
           <button
@@ -1868,7 +1817,6 @@ export default function ReviewPage() {
           >
             Preview Assessment
           </button>
-
         </section>
 
         {/* ====================================================
@@ -1876,7 +1824,6 @@ export default function ReviewPage() {
         ==================================================== */}
 
         <footer className="review-footer">
-
           <button
             type="button"
             className="secondary-button"
@@ -1890,46 +1837,33 @@ export default function ReviewPage() {
           </button>
 
           <div className="footer-actions">
-
             {!isReady && (
-
               <span className="footer-error-message">
-
-                Resolve
-                {" "}
+                Resolve{" "}
                 {
                   blockingErrors.length
-                }
-                {" "}
+                }{" "}
                 blocking issue
                 {blockingErrors.length ===
                 1
                   ? ""
                   : "s"}
-
               </span>
-
             )}
 
             <button
               type="button"
               className="primary-button"
-              disabled={
-                !isReady
-              }
+              disabled={!isReady}
               onClick={
                 continueToPublish
               }
             >
               Continue to Publish →
             </button>
-
           </div>
-
         </footer>
-
       </div>
-
     </main>
   );
 }
@@ -1940,11 +1874,8 @@ export default function ReviewPage() {
 
 interface StepperItemProps {
   number: string;
-
   label: string;
-
   active?: boolean;
-
   complete?: boolean;
 }
 
@@ -1957,28 +1888,22 @@ function StepperItem({
   return (
     <div
       className={`stepper-item ${
-        active
-          ? "active"
-          : ""
+        active ? "active" : ""
       } ${
         complete
           ? "complete"
           : ""
       }`}
     >
-
       <span className="step-number">
-
         {complete
           ? "✓"
           : number}
-
       </span>
 
       <span>
         {label}
       </span>
-
     </div>
   );
 }
@@ -1989,7 +1914,6 @@ function StepperItem({
 
 interface SummaryItemProps {
   label: string;
-
   value: string;
 }
 
@@ -1999,7 +1923,6 @@ function SummaryItem({
 }: SummaryItemProps) {
   return (
     <div className="summary-item">
-
       <span>
         {label}
       </span>
@@ -2007,7 +1930,6 @@ function SummaryItem({
       <strong>
         {value}
       </strong>
-
     </div>
   );
 }
@@ -2018,11 +1940,8 @@ function SummaryItem({
 
 interface ReviewSectionHeaderProps {
   number: string;
-
   title: string;
-
   description: string;
-
   onEdit: () => void;
 }
 
@@ -2034,15 +1953,12 @@ function ReviewSectionHeader({
 }: ReviewSectionHeaderProps) {
   return (
     <div className="review-section-header">
-
       <div className="section-heading">
-
         <span className="section-number">
           {number}
         </span>
 
         <div>
-
           <h2>
             {title}
           </h2>
@@ -2050,21 +1966,16 @@ function ReviewSectionHeader({
           <p>
             {description}
           </p>
-
         </div>
-
       </div>
 
       <button
         type="button"
         className="edit-section-button"
-        onClick={
-          onEdit
-        }
+        onClick={onEdit}
       >
         Edit
       </button>
-
     </div>
   );
 }
@@ -2075,7 +1986,6 @@ function ReviewSectionHeader({
 
 interface ReviewFieldProps {
   label: string;
-
   value:
     | string
     | number;
@@ -2087,7 +1997,6 @@ function ReviewField({
 }: ReviewFieldProps) {
   return (
     <div className="review-field">
-
       <span>
         {label}
       </span>
@@ -2095,7 +2004,6 @@ function ReviewField({
       <strong>
         {value}
       </strong>
-
     </div>
   );
 }
@@ -2106,7 +2014,6 @@ function ReviewField({
 
 interface SecurityReviewItemProps {
   label: string;
-
   enabled:
     | boolean
     | undefined;
@@ -2118,7 +2025,6 @@ function SecurityReviewItem({
 }: SecurityReviewItemProps) {
   return (
     <div className="security-review-item">
-
       <span
         className={`security-state ${
           enabled
@@ -2134,7 +2040,6 @@ function SecurityReviewItem({
       <span>
         {label}
       </span>
-
     </div>
   );
 }
