@@ -58,20 +58,28 @@ export default function AssessmentsPage() {
   const [difficulty, setDifficulty] =
     useState("ALL");
 
+  /* ============================================================
+     LOAD ASSESSMENTS
+     ============================================================ */
+
   useEffect(() => {
     loadAssessments();
   }, []);
 
   async function loadAssessments() {
     try {
-      const response =
-        await fetch(
-          `${API_URL}/assessment`
-        );
+      setLoading(true);
+
+      const response = await fetch(
+        `${API_URL}/assessment`,
+        {
+          cache: "no-store",
+        },
+      );
 
       if (!response.ok) {
         throw new Error(
-          `Unable to load assessments (${response.status})`
+          `Unable to load assessments (${response.status})`,
         );
       }
 
@@ -85,22 +93,32 @@ export default function AssessmentsPage() {
             ? responseData.data
             : [];
 
+      /* ========================================================
+         STATUS NORMALIZATION
+         ======================================================== */
+
       const normalizedStatus = (
-        value: string
+        value: string,
       ): AssessmentStatus => {
-        const status =
-          value?.toUpperCase();
+        const currentStatus =
+          String(value ?? "")
+            .toUpperCase()
+            .trim();
 
         if (
-          status === "PUBLISHED"
+          currentStatus ===
+          "PUBLISHED"
         ) {
           return "PUBLISHED";
         }
 
         if (
-          status === "COMPLETED" ||
-          status === "APPROVED" ||
-          status === "IN_REVIEW"
+          currentStatus ===
+            "COMPLETED" ||
+          currentStatus ===
+            "APPROVED" ||
+          currentStatus ===
+            "IN_REVIEW"
         ) {
           return "COMPLETED";
         }
@@ -108,175 +126,365 @@ export default function AssessmentsPage() {
         return "DRAFT";
       };
 
+      /* ========================================================
+         TEXT FORMATTER
+         ======================================================== */
+
       const formatText = (
-        value: string | null | undefined
+        value:
+          | string
+          | null
+          | undefined,
       ) => {
         if (!value) {
           return "-";
         }
 
-        return value
+        return String(value)
           .replaceAll("_", " ")
           .toLowerCase()
           .replace(
             /\b\w/g,
-            (char) => char.toUpperCase()
+            (char) =>
+              char.toUpperCase(),
           );
       };
 
+      /* ========================================================
+         NORMALIZE ASSESSMENTS
+         ======================================================== */
+
       setAssessments(
         data.map((item: any) => ({
-          id:
-            String(item.id ?? ""),
+          id: String(
+            item.id ?? "",
+          ),
 
-          code:
-            String(item.code ?? "-"),
+          code: String(
+            item.code ?? "-",
+          ),
 
-          title:
-            String(
-              item.title ??
-              "Untitled Assessment"
-            ),
+          title: String(
+            item.title ??
+              "Untitled Assessment",
+          ),
 
-          type:
-            formatText(
-              item.assessmentType
-            ),
+          type: formatText(
+            item.assessmentType,
+          ),
 
-          technology:
-            item.technology
-              ? String(item.technology)
-              : "-",
+          technology: item.technology
+            ? String(
+                item.technology,
+              )
+            : "-",
 
-          difficulty:
-            formatText(
-              item.difficulty
-            ),
+          difficulty: formatText(
+            item.difficulty,
+          ),
 
-          questions:
-            Number(
-              item.plannedQuestions ?? 0
-            ),
+          questions: Number(
+            item.plannedQuestions ??
+              0,
+          ),
 
-          marks:
-            Number(
-              item.totalMarks ?? 0
-            ),
+          marks: Number(
+            item.totalMarks ?? 0,
+          ),
 
-          duration:
-            Number(
-              item.durationMinutes ?? 0
-            ),
+          duration: Number(
+            item.durationMinutes ??
+              0,
+          ),
 
           status:
             normalizedStatus(
-              item.status
+              item.status,
             ),
 
+          /*
+           * Keep the backend builderStep.
+           *
+           * Navigation is normalized later so that
+           * legacy "assessment-sections" values can
+           * never create an old route.
+           */
           builderStep:
             item.builderStep
-              ? String(item.builderStep)
+              ? String(
+                  item.builderStep,
+                )
               : "SETUP",
 
           updatedAt:
             item.updatedAt
               ? new Date(
-                  item.updatedAt
+                  item.updatedAt,
                 ).toLocaleDateString()
-              : "-"
-        }))
+              : "-",
+        })),
       );
     } catch (error) {
       console.error(
         "ASSESSMENT LOAD ERROR",
-        error
+        error,
       );
     } finally {
       setLoading(false);
     }
   }
 
+  /* ============================================================
+     NORMALIZE BUILDER STEP
+     
+     IMPORTANT:
+     Assessment Sections has been removed from the flow.
+     
+     Therefore:
+     
+     assessment-sections
+             ↓
+     structure
+     
+     There is NO navigation to:
+     
+     /assessment-sections
+     ============================================================ */
+
+  function getBuilderRoute(
+    builderStep?: string,
+  ): string {
+    const step =
+      String(
+        builderStep ?? "",
+      )
+        .trim()
+        .toLowerCase()
+        .replaceAll("_", "-")
+        .replaceAll(" ", "-");
+
+    switch (step) {
+      /* --------------------------------------------------------
+         STEP 1
+         -------------------------------------------------------- */
+
+      case "":
+      case "setup":
+      case "assessment-setup":
+      case "create":
+      case "edit":
+      case "assessment":
+        return "edit";
+
+      /* --------------------------------------------------------
+         STEP 2
+         
+         Current flow:
+         Assessment Structure
+         
+         Legacy assessment-sections values are deliberately
+         mapped to structure.
+         -------------------------------------------------------- */
+
+      case "structure":
+      case "assessment-structure":
+      case "assessment-section":
+      case "assessment-sections":
+      case "sections":
+        return "structure";
+
+      /* --------------------------------------------------------
+         STEP 3
+         -------------------------------------------------------- */
+
+      case "question":
+      case "questions":
+      case "assessment-questions":
+        return "questions";
+
+      /* --------------------------------------------------------
+         STEP 4
+         -------------------------------------------------------- */
+
+      case "scoring":
+      case "scoring-rules":
+      case "rules":
+        return "scoring";
+
+      /* --------------------------------------------------------
+         STEP 5
+         -------------------------------------------------------- */
+
+      case "delivery":
+      case "security":
+      case "schedule":
+      case "assignment":
+        return "delivery";
+
+      /* --------------------------------------------------------
+         STEP 6
+         -------------------------------------------------------- */
+
+      case "review":
+      case "preview":
+      case "review-publish":
+        return "review";
+
+      /* --------------------------------------------------------
+         PUBLISH
+         -------------------------------------------------------- */
+
+      case "publish":
+        return "publish";
+
+      /* --------------------------------------------------------
+         FALLBACK
+         -------------------------------------------------------- */
+
+      default:
+        return "edit";
+    }
+  }
+
+  /* ============================================================
+     OPEN ASSESSMENT
+     ============================================================ */
+
   function openAssessment(
-    assessment: Assessment
+    assessment: Assessment,
   ) {
+    /*
+     * Published assessments always open in
+     * read-only review mode.
+     */
     if (
-      assessment.status === "PUBLISHED"
+      assessment.status ===
+      "PUBLISHED"
     ) {
       router.push(
-        `/assessments/${assessment.id}/review?mode=view`
+        `/assessments/${assessment.id}/review?mode=view`,
       );
 
       return;
     }
 
+    /*
+     * Draft assessments continue from their
+     * current authoring step.
+     */
     if (
-      assessment.status === "DRAFT"
+      assessment.status ===
+      "DRAFT"
     ) {
       const step =
-        assessment.builderStep
-          ?.toLowerCase() ||
-        "setup";
+        getBuilderRoute(
+          assessment.builderStep,
+        );
 
       router.push(
-        `/assessments/${assessment.id}/${step}`
+        `/assessments/${assessment.id}/${step}`,
       );
 
       return;
     }
 
+    /*
+     * Completed / other states.
+     */
     router.push(
-      `/assessments/${assessment.id}/review`
+      `/assessments/${assessment.id}/review`,
     );
   }
 
-  /**
-   * Open results for this assessment.
-   *
-   * This page is intended for the person
-   * who has permission to view the
-   * assessment results.
-   */
+  /* ============================================================
+     OPEN RESULTS
+     ============================================================ */
+
   function openResults(
-    assessment: Assessment
+    assessment: Assessment,
   ) {
     router.push(
-      `/assessments/${assessment.id}/results`
+      `/assessments/${assessment.id}/results`,
     );
   }
+
+  /* ============================================================
+     DELETE
+     ============================================================ */
 
   async function deleteAssessment(
-    id: string
+    id: string,
   ) {
-    await fetch(
-      `${API_URL}/assessment/${id}`,
-      {
-        method: "DELETE"
-      }
-    );
+    try {
+      const response =
+        await fetch(
+          `${API_URL}/assessment/${id}`,
+          {
+            method: "DELETE",
+          },
+        );
 
-    loadAssessments();
+      if (!response.ok) {
+        throw new Error(
+          "Unable to delete assessment.",
+        );
+      }
+
+      await loadAssessments();
+    } catch (error) {
+      console.error(
+        "ASSESSMENT DELETE ERROR",
+        error,
+      );
+    }
   }
+
+  /* ============================================================
+     CLONE
+     ============================================================ */
 
   function cloneAssessment(
-    id: string
+    id: string,
   ) {
     router.push(
-      `/assessments/create?clone=${id}`
+      `/assessments/create?clone=${id}`,
     );
   }
+
+  /* ============================================================
+     UNPUBLISH
+     ============================================================ */
 
   async function unpublishAssessment(
-    id: string
+    id: string,
   ) {
-    await fetch(
-      `${API_URL}/assessment/${id}/unpublish`,
-      {
-        method: "PATCH"
-      }
-    );
+    try {
+      const response =
+        await fetch(
+          `${API_URL}/assessment/${id}/unpublish`,
+          {
+            method: "PATCH",
+          },
+        );
 
-    loadAssessments();
+      if (!response.ok) {
+        throw new Error(
+          "Unable to unpublish assessment.",
+        );
+      }
+
+      await loadAssessments();
+    } catch (error) {
+      console.error(
+        "ASSESSMENT UNPUBLISH ERROR",
+        error,
+      );
+    }
   }
+
+  /* ============================================================
+     FILTER OPTIONS
+     ============================================================ */
 
   const assessmentTypes =
     useMemo(
@@ -286,16 +494,16 @@ export default function AssessmentsPage() {
             assessments
               .map(
                 (item) =>
-                  item.type
+                  item.type,
               )
               .filter(
                 (value) =>
                   Boolean(value) &&
-                  value !== "-"
-              )
-          )
+                  value !== "-",
+              ),
+          ),
         ).sort(),
-      [assessments]
+      [assessments],
     );
 
   const technologies =
@@ -306,16 +514,16 @@ export default function AssessmentsPage() {
             assessments
               .map(
                 (item) =>
-                  item.technology
+                  item.technology,
               )
               .filter(
                 (value) =>
                   Boolean(value) &&
-                  value !== "-"
-              )
-          )
+                  value !== "-",
+              ),
+          ),
         ).sort(),
-      [assessments]
+      [assessments],
     );
 
   const difficulties =
@@ -326,32 +534,43 @@ export default function AssessmentsPage() {
             assessments
               .map(
                 (item) =>
-                  item.difficulty
+                  item.difficulty,
               )
               .filter(
                 (value) =>
                   Boolean(value) &&
-                  value !== "-"
-              )
-          )
+                  value !== "-",
+              ),
+          ),
         ).sort(),
-      [assessments]
+      [assessments],
     );
+
+  /* ============================================================
+     FILTER ASSESSMENTS
+     ============================================================ */
 
   const filteredAssessments =
     useMemo(() => {
       return assessments.filter(
         (assessment) => {
           const searchValue =
-            search.toLowerCase();
+            search
+              .trim()
+              .toLowerCase();
 
           const matchesSearch =
+            !searchValue ||
             assessment.title
               .toLowerCase()
-              .includes(searchValue) ||
+              .includes(
+                searchValue,
+              ) ||
             assessment.code
               .toLowerCase()
-              .includes(searchValue);
+              .includes(
+                searchValue,
+              );
 
           const matchesStatus =
             status === "ALL" ||
@@ -360,7 +579,8 @@ export default function AssessmentsPage() {
 
           const matchesType =
             type === "ALL" ||
-            assessment.type === type;
+            assessment.type ===
+              type;
 
           const matchesTechnology =
             technology === "ALL" ||
@@ -379,7 +599,7 @@ export default function AssessmentsPage() {
             matchesTechnology &&
             matchesDifficulty
           );
-        }
+        },
       );
     }, [
       assessments,
@@ -387,8 +607,12 @@ export default function AssessmentsPage() {
       status,
       type,
       technology,
-      difficulty
+      difficulty,
     ]);
+
+  /* ============================================================
+     SUMMARY COUNTS
+     ============================================================ */
 
   const totalAssessments =
     assessments.length;
@@ -396,32 +620,41 @@ export default function AssessmentsPage() {
   const draftCount =
     assessments.filter(
       (assessment) =>
-        assessment.status === "DRAFT"
+        assessment.status ===
+        "DRAFT",
     ).length;
 
   const completedCount =
     assessments.filter(
       (assessment) =>
         assessment.status ===
-        "COMPLETED"
+        "COMPLETED",
     ).length;
 
   const publishedCount =
     assessments.filter(
       (assessment) =>
         assessment.status ===
-        "PUBLISHED"
+        "PUBLISHED",
     ).length;
+
+  /* ============================================================
+     CREATE ASSESSMENT
+     ============================================================ */
 
   function createAssessment() {
     router.push(
-      "/assessments/create"
+      "/assessments/create",
     );
   }
 
+  /* ============================================================
+     STATUS CLASS
+     ============================================================ */
+
   function getStatusClass(
     assessmentStatus:
-      AssessmentStatus
+      AssessmentStatus,
   ) {
     switch (
       assessmentStatus
@@ -440,25 +673,33 @@ export default function AssessmentsPage() {
     }
   }
 
+  /* ============================================================
+     STATUS FORMAT
+     ============================================================ */
+
   function formatStatus(
     assessmentStatus:
-      AssessmentStatus
+      AssessmentStatus,
   ) {
     return assessmentStatus
       .replaceAll("_", " ");
   }
 
+  /* ============================================================
+     UI
+     ============================================================ */
+
   return (
     <main className="assessment-page">
-
       <div className="assessment-container">
 
-        {/* HEADER */}
+        {/* ==================================================
+            HEADER
+        ================================================== */}
 
         <header className="assessment-header">
 
           <div>
-
             <h1>
               Assessments
             </h1>
@@ -466,15 +707,14 @@ export default function AssessmentsPage() {
             <p>
               Create, manage,
               review and publish
-              assessments for learners.
+              assessments for
+              learners.
             </p>
-
           </div>
 
           <button
             type="button"
-            className=
-              "create-assessment-button"
+            className="create-assessment-button"
             onClick={
               createAssessment
             }
@@ -484,69 +724,71 @@ export default function AssessmentsPage() {
 
         </header>
 
-        {/* SUMMARY */}
+        {/* ==================================================
+            SUMMARY
+        ================================================== */}
 
         <section className="summary-grid">
 
           <SummaryCard
             label="Total Assessments"
-            value={totalAssessments}
+            value={
+              totalAssessments
+            }
           />
 
           <SummaryCard
             label="Draft"
-            value={draftCount}
+            value={
+              draftCount
+            }
           />
 
           <SummaryCard
             label="Completed"
-            value={completedCount}
+            value={
+              completedCount
+            }
           />
 
           <SummaryCard
             label="Published"
-            value={publishedCount}
+            value={
+              publishedCount
+            }
           />
 
         </section>
 
-        {/* FILTERS */}
+        {/* ==================================================
+            FILTERS
+        ================================================== */}
 
-        <section
-          className=
-            "assessment-filter-card"
-        >
+        <section className="assessment-filter-card">
 
-          <div
-            className=
-              "assessment-filter-grid"
-          >
+          <div className="assessment-filter-grid">
 
             <input
-              className=
-                "assessment-input"
+              className="assessment-input"
               type="text"
-              placeholder=
-                "Search assessment name or code..."
+              placeholder="Search assessment name or code..."
               value={search}
               onChange={(event) =>
                 setSearch(
-                  event.target.value
+                  event.target.value,
                 )
               }
             />
 
             <select
-              className=
-                "assessment-select"
+              className="assessment-select"
               value={status}
               onChange={(event) =>
                 setStatus(
-                  event.target.value
+                  event.target.value,
                 )
               }
             >
-
               <option value="ALL">
                 All Status
               </option>
@@ -562,20 +804,17 @@ export default function AssessmentsPage() {
               <option value="PUBLISHED">
                 Published
               </option>
-
             </select>
 
             <select
-              className=
-                "assessment-select"
+              className="assessment-select"
               value={type}
               onChange={(event) =>
                 setType(
-                  event.target.value
+                  event.target.value,
                 )
               }
             >
-
               <option value="ALL">
                 All Types
               </option>
@@ -588,22 +827,19 @@ export default function AssessmentsPage() {
                   >
                     {typeValue}
                   </option>
-                )
+                ),
               )}
-
             </select>
 
             <select
-              className=
-                "assessment-select"
+              className="assessment-select"
               value={technology}
               onChange={(event) =>
                 setTechnology(
-                  event.target.value
+                  event.target.value,
                 )
               }
             >
-
               <option value="ALL">
                 All Technologies
               </option>
@@ -611,27 +847,30 @@ export default function AssessmentsPage() {
               {technologies.map(
                 (technologyValue) => (
                   <option
-                    key={technologyValue}
-                    value={technologyValue}
+                    key={
+                      technologyValue
+                    }
+                    value={
+                      technologyValue
+                    }
                   >
-                    {technologyValue}
+                    {
+                      technologyValue
+                    }
                   </option>
-                )
+                ),
               )}
-
             </select>
 
             <select
-              className=
-                "assessment-select"
+              className="assessment-select"
               value={difficulty}
               onChange={(event) =>
                 setDifficulty(
-                  event.target.value
+                  event.target.value,
                 )
               }
             >
-
               <option value="ALL">
                 All Difficulty
               </option>
@@ -639,21 +878,28 @@ export default function AssessmentsPage() {
               {difficulties.map(
                 (difficultyValue) => (
                   <option
-                    key={difficultyValue}
-                    value={difficultyValue}
+                    key={
+                      difficultyValue
+                    }
+                    value={
+                      difficultyValue
+                    }
                   >
-                    {difficultyValue}
+                    {
+                      difficultyValue
+                    }
                   </option>
-                )
+                ),
               )}
-
             </select>
 
           </div>
 
         </section>
 
-        {/* TABLE */}
+        {/* ==================================================
+            LOADING
+        ================================================== */}
 
         {loading && (
           <div className="empty-state">
@@ -661,20 +907,16 @@ export default function AssessmentsPage() {
           </div>
         )}
 
-        <section
-          className=
-            "assessment-table-card"
-        >
+        {/* ==================================================
+            TABLE
+        ================================================== */}
 
-          <table
-            className=
-              "assessment-table"
-          >
+        <section className="assessment-table-card">
+
+          <table className="assessment-table">
 
             <thead>
-
               <tr>
-
                 <th>
                   Assessment
                 </th>
@@ -714,9 +956,7 @@ export default function AssessmentsPage() {
                 <th>
                   Action
                 </th>
-
               </tr>
-
             </thead>
 
             <tbody>
@@ -731,19 +971,13 @@ export default function AssessmentsPage() {
 
                     <td>
 
-                      <span
-                        className=
-                          "assessment-name"
-                      >
+                      <span className="assessment-name">
                         {
                           assessment.title
                         }
                       </span>
 
-                      <span
-                        className=
-                          "assessment-code"
-                      >
+                      <span className="assessment-code">
                         {
                           assessment.code
                         }
@@ -759,36 +993,31 @@ export default function AssessmentsPage() {
 
                     <td>
                       {
-                        assessment
-                          .technology
+                        assessment.technology
                       }
                     </td>
 
                     <td>
                       {
-                        assessment
-                          .difficulty
+                        assessment.difficulty
                       }
                     </td>
 
                     <td>
                       {
-                        assessment
-                          .questions
+                        assessment.questions
                       }
                     </td>
 
                     <td>
                       {
-                        assessment
-                          .marks
+                        assessment.marks
                       }
                     </td>
 
                     <td>
                       {
-                        assessment
-                          .duration
+                        assessment.duration
                       }{" "}
                       min
                     </td>
@@ -797,21 +1026,21 @@ export default function AssessmentsPage() {
 
                       <span
                         className={`status-badge ${getStatusClass(
-                          assessment.status
+                          assessment.status,
                         )}`}
                       >
-                        {formatStatus(
-                          assessment
-                            .status
-                        )}
+                        {
+                          formatStatus(
+                            assessment.status,
+                          )
+                        }
                       </span>
 
                     </td>
 
                     <td>
                       {
-                        assessment
-                          .updatedAt
+                        assessment.updatedAt
                       }
                     </td>
 
@@ -824,7 +1053,7 @@ export default function AssessmentsPage() {
                         className="assessment-action"
                         onClick={() =>
                           openAssessment(
-                            assessment
+                            assessment,
                           )
                         }
                       >
@@ -838,7 +1067,7 @@ export default function AssessmentsPage() {
                         className="assessment-action"
                         onClick={() =>
                           openResults(
-                            assessment
+                            assessment,
                           )
                         }
                       >
@@ -852,7 +1081,7 @@ export default function AssessmentsPage() {
                         className="assessment-action"
                         onClick={() =>
                           cloneAssessment(
-                            assessment.id
+                            assessment.id,
                           )
                         }
                       >
@@ -868,7 +1097,7 @@ export default function AssessmentsPage() {
                           className="assessment-action"
                           onClick={() =>
                             deleteAssessment(
-                              assessment.id
+                              assessment.id,
                             )
                           }
                         >
@@ -885,7 +1114,7 @@ export default function AssessmentsPage() {
                           className="assessment-action"
                           onClick={() =>
                             unpublishAssessment(
-                              assessment.id
+                              assessment.id,
                             )
                           }
                         >
@@ -896,7 +1125,7 @@ export default function AssessmentsPage() {
                     </td>
 
                   </tr>
-                )
+                ),
               )}
 
             </tbody>
@@ -906,10 +1135,7 @@ export default function AssessmentsPage() {
           {!loading &&
             filteredAssessments.length ===
               0 && (
-              <div
-                className=
-                  "empty-state"
-              >
+              <div className="empty-state">
                 No assessments
                 match the selected
                 filters.
@@ -919,10 +1145,13 @@ export default function AssessmentsPage() {
         </section>
 
       </div>
-
     </main>
   );
 }
+
+/* ============================================================
+   SUMMARY CARD
+   ============================================================ */
 
 interface SummaryCardProps {
   label: string;
@@ -931,20 +1160,16 @@ interface SummaryCardProps {
 
 function SummaryCard({
   label,
-  value
+  value,
 }: SummaryCardProps) {
   return (
     <div className="summary-card">
 
-      <span
-        className="summary-label"
-      >
+      <span className="summary-label">
         {label}
       </span>
 
-      <span
-        className="summary-value"
-      >
+      <span className="summary-value">
         {value}
       </span>
 
