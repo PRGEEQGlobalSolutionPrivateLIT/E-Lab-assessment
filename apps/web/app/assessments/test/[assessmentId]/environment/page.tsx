@@ -8,6 +8,7 @@ import {
 } from "next/navigation";
 
 import Editor from "@monaco-editor/react";
+import { API_URL } from "@/lib/api/fetcher";
 
 
 /*
@@ -776,9 +777,7 @@ export default function EnvironmentPage() {
   ------------------------------------------------------
   */
 
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:3001";
+
 
 
   /*
