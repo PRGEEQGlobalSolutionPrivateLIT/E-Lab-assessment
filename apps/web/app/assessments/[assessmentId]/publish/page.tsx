@@ -11,6 +11,8 @@ import {
   useRouter,
 } from "next/navigation";
 
+import { API_URL } from "@/src/lib/api/fetcher";
+
 import "./publish.css";
 
 /* ============================================================
@@ -234,45 +236,35 @@ export default function PublishPage() {
      ============================================================ */
 
   useEffect(() => {
-
     async function loadPublishData() {
-
       try {
-
-        const API_URL =
-          process.env.NEXT_PUBLIC_API_URL ??
-          "http://localhost:3001";
-
-
         const [
           assessmentResponse,
           questionsResponse,
           scoringResponse,
           deliveryResponse,
           publicationResponse,
-        ] =
-          await Promise.all([
-            fetch(
-              `${API_URL}/assessment/${assessmentId}`,
-            ),
+        ] = await Promise.all([
+          fetch(
+            `${API_URL}/assessment/${assessmentId}`,
+          ),
 
-            fetch(
-              `${API_URL}/questions/assessment/${assessmentId}`,
-            ),
+          fetch(
+            `${API_URL}/questions/assessment/${assessmentId}`,
+          ),
 
-            fetch(
-              `${API_URL}/scoring/${assessmentId}`,
-            ),
+          fetch(
+            `${API_URL}/scoring/${assessmentId}`,
+          ),
 
-            fetch(
-              `${API_URL}/delivery/${assessmentId}`,
-            ),
+          fetch(
+            `${API_URL}/delivery/${assessmentId}`,
+          ),
 
-            fetch(
-              `${API_URL}/assessment/${assessmentId}/publication`,
-            ),
-          ]);
-
+          fetch(
+            `${API_URL}/assessment/${assessmentId}/publication`,
+          ),
+        ]);
 
         if (assessmentResponse.ok) {
           setAssessment(
@@ -280,9 +272,7 @@ export default function PublishPage() {
           );
         }
 
-
         if (questionsResponse.ok) {
-
           const questionData =
             await questionsResponse.json();
 
@@ -293,84 +283,73 @@ export default function PublishPage() {
           );
         }
 
-
         if (scoringResponse.ok) {
-
           setScoring(
             await scoringResponse.json(),
           );
         }
 
-
         if (deliveryResponse.ok) {
-
           const deliveryData =
             await deliveryResponse.json();
 
-
           setDelivery({
-
             ...(deliveryData.delivery ?? {}),
 
             ...(deliveryData.security ?? {}),
 
-
             startDate:
               deliveryData.delivery?.startsAt
-                ? deliveryData.delivery.startsAt.substring(0,10)
+                ? deliveryData.delivery.startsAt.substring(
+                    0,
+                    10,
+                  )
                 : "",
 
             startTime:
               deliveryData.delivery?.startsAt
-                ? deliveryData.delivery.startsAt.substring(11,16)
+                ? deliveryData.delivery.startsAt.substring(
+                    11,
+                    16,
+                  )
                 : "",
 
             endDate:
               deliveryData.delivery?.endsAt
-                ? deliveryData.delivery.endsAt.substring(0,10)
+                ? deliveryData.delivery.endsAt.substring(
+                    0,
+                    10,
+                  )
                 : "",
 
             endTime:
               deliveryData.delivery?.endsAt
-                ? deliveryData.delivery.endsAt.substring(11,16)
+                ? deliveryData.delivery.endsAt.substring(
+                    11,
+                    16,
+                  )
                 : "",
-
           });
-
         }
 
-
         if (publicationResponse.ok) {
-
           setPublication(
             await publicationResponse.json(),
           );
-
         }
-
-
-      }
-      catch(error) {
-
+      } catch (error) {
         console.error(
           "PUBLISH LOAD ERROR:",
           error,
         );
-
-      }
-      finally {
-
+      } finally {
         setLoaded(true);
-
       }
-
     }
-
 
     if (assessmentId) {
       loadPublishData();
     }
-
   }, [assessmentId]);
 
   /* ============================================================
@@ -664,18 +643,13 @@ export default function PublishPage() {
           now,
       };
 
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL ??
-        "http://localhost:3001";
-
-
       const response =
         await fetch(
           `${API_URL}/assessment/${assessmentId}/publish`,
           {
-            method:"PATCH",
+            method: "PATCH",
 
-            headers:{
+            headers: {
               "Content-Type":
                 "application/json",
             },
@@ -685,19 +659,14 @@ export default function PublishPage() {
           },
         );
 
-
-      if(!response.ok){
-
+      if (!response.ok) {
         throw new Error(
           await response.text(),
         );
-
       }
-
 
       const publishedData =
         await response.json();
-
 
       setPublication(
         publishedData,
@@ -736,19 +705,13 @@ export default function PublishPage() {
   if (!loaded) {
     return (
       <main className="publish-page">
-
         <div className="publish-container">
-
           <div className="publish-loading-card">
-
             <strong>
               Loading publication details...
             </strong>
-
           </div>
-
         </div>
-
       </main>
     );
   }
@@ -760,11 +723,8 @@ export default function PublishPage() {
   if (!assessment) {
     return (
       <main className="publish-page">
-
         <div className="publish-container">
-
           <div className="missing-card">
-
             <h2>
               Assessment data not found
             </h2>
@@ -785,11 +745,8 @@ export default function PublishPage() {
             >
               Return to Assessments
             </button>
-
           </div>
-
         </div>
-
       </main>
     );
   }
@@ -800,17 +757,9 @@ export default function PublishPage() {
 
   return (
     <main className="publish-page">
-
       <div className="publish-container">
-
-        {/* ====================================================
-            HEADER
-        ==================================================== */}
-
         <header className="publish-header">
-
           <div>
-
             <button
               type="button"
               className="back-link"
@@ -836,11 +785,9 @@ export default function PublishPage() {
               configuration before making
               it available for delivery.
             </p>
-
           </div>
 
           <div className="assessment-chip">
-
             <span>
               {assessment.code}
             </span>
@@ -862,17 +809,10 @@ export default function PublishPage() {
                 ? "Published"
                 : "Draft"}
             </small>
-
           </div>
-
         </header>
 
-        {/* ====================================================
-            STEPPER
-        ==================================================== */}
-
         <section className="assessment-stepper">
-
           <StepperItem
             number="1"
             label="Setup"
@@ -908,12 +848,7 @@ export default function PublishPage() {
             label="Publish"
             active
           />
-
         </section>
-
-        {/* ====================================================
-            PUBLICATION READINESS
-        ==================================================== */}
 
         <section
           className={`publish-readiness ${
@@ -922,9 +857,7 @@ export default function PublishPage() {
               : "not-ready"
           }`}
         >
-
           <div className="readiness-heading">
-
             <span className="readiness-icon">
               {readiness.allReady
                 ? "✓"
@@ -932,7 +865,6 @@ export default function PublishPage() {
             </span>
 
             <div>
-
               <strong>
                 {readiness.allReady
                   ? "Ready to publish"
@@ -944,13 +876,10 @@ export default function PublishPage() {
                   ? "All required configuration checks have passed."
                   : "Return to the appropriate assessment step and resolve the remaining issues."}
               </p>
-
             </div>
-
           </div>
 
           <div className="readiness-check-grid">
-
             <ReadinessItem
               label="Assessment Setup"
               ready={
@@ -992,25 +921,16 @@ export default function PublishPage() {
                 readiness.assignment
               }
             />
-
           </div>
-
         </section>
 
-        {/* ====================================================
-            1. ASSESSMENT SUMMARY
-        ==================================================== */}
-
         <section className="publish-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               1
             </span>
 
             <div>
-
               <h2>
                 Assessment Summary
               </h2>
@@ -1019,13 +939,10 @@ export default function PublishPage() {
                 Final assessment
                 configuration.
               </p>
-
             </div>
-
           </div>
 
           <div className="publish-detail-grid">
-
             <PublishField
               label="Assessment Title"
               value={
@@ -1087,25 +1004,16 @@ export default function PublishPage() {
                   : "Not configured"
               }
             />
-
           </div>
-
         </section>
 
-        {/* ====================================================
-            2. ASSIGNMENT & DELIVERY
-        ==================================================== */}
-
         <section className="publish-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               2
             </span>
 
             <div>
-
               <h2>
                 Assignment & Delivery
               </h2>
@@ -1115,13 +1023,10 @@ export default function PublishPage() {
                 the assessment will be
                 delivered.
               </p>
-
             </div>
-
           </div>
 
           <div className="publish-detail-grid">
-
             <PublishField
               label="Audience Type"
               value={
@@ -1175,25 +1080,16 @@ export default function PublishPage() {
                   : "Not configured"
               }
             />
-
           </div>
-
         </section>
 
-        {/* ====================================================
-            3. PUBLICATION BEHAVIOR
-        ==================================================== */}
-
         <section className="publish-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               3
             </span>
 
             <div>
-
               <h2>
                 Publication Behavior
               </h2>
@@ -1203,21 +1099,16 @@ export default function PublishPage() {
                 when this assessment is
                 published.
               </p>
-
             </div>
-
           </div>
 
           <div className="publication-info">
-
             <div className="publication-info-item">
-
               <span className="info-icon">
                 1
               </span>
 
               <div>
-
                 <strong>
                   Assessment becomes published
                 </strong>
@@ -1226,19 +1117,15 @@ export default function PublishPage() {
                   The assessment moves from
                   Draft to Published status.
                 </p>
-
               </div>
-
             </div>
 
             <div className="publication-info-item">
-
               <span className="info-icon">
                 2
               </span>
 
               <div>
-
                 <strong>
                   Assignment rules remain applicable
                 </strong>
@@ -1248,19 +1135,15 @@ export default function PublishPage() {
                   configured audience should be
                   eligible to access it.
                 </p>
-
               </div>
-
             </div>
 
             <div className="publication-info-item">
-
               <span className="info-icon">
                 3
               </span>
 
               <div>
-
                 <strong>
                   Availability controls access
                 </strong>
@@ -1270,19 +1153,15 @@ export default function PublishPage() {
                   attempts within the configured
                   availability window.
                 </p>
-
               </div>
-
             </div>
 
             <div className="publication-info-item">
-
               <span className="info-icon">
                 4
               </span>
 
               <div>
-
                 <strong>
                   Publishing does not bypass permissions
                 </strong>
@@ -1292,15 +1171,11 @@ export default function PublishPage() {
                   entitlement and assignment checks
                   still apply.
                 </p>
-
               </div>
-
             </div>
-
           </div>
 
           <div className="access-formula">
-
             <span>
               Published
             </span>
@@ -1344,25 +1219,16 @@ export default function PublishPage() {
             <span className="accessible">
               Accessible
             </span>
-
           </div>
-
         </section>
 
-        {/* ====================================================
-            4. FINAL CONFIRMATION
-        ==================================================== */}
-
         <section className="publish-card final-confirmation-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               4
             </span>
 
             <div>
-
               <h2>
                 Final Confirmation
               </h2>
@@ -1371,9 +1237,7 @@ export default function PublishPage() {
                 Confirm the assessment is
                 ready for publication.
               </p>
-
             </div>
-
           </div>
 
           <label
@@ -1383,7 +1247,6 @@ export default function PublishPage() {
                 : ""
             }`}
           >
-
             <input
               type="checkbox"
               checked={
@@ -1401,7 +1264,6 @@ export default function PublishPage() {
             <span className="confirmation-check" />
 
             <div>
-
               <strong>
                 I confirm this assessment is ready to publish.
               </strong>
@@ -1411,15 +1273,11 @@ export default function PublishPage() {
                 scoring, assignment, availability,
                 AI policy and security configuration.
               </p>
-
             </div>
-
           </label>
 
           {!readiness.allReady && (
-
             <div className="publish-blocked-message">
-
               <strong>
                 Publishing is currently blocked.
               </strong>
@@ -1429,13 +1287,10 @@ export default function PublishPage() {
                 the Review or corresponding
                 configuration screens first.
               </p>
-
             </div>
-
           )}
 
           {message && (
-
             <div
               className={`publish-message ${
                 publication?.status ===
@@ -1446,17 +1301,10 @@ export default function PublishPage() {
             >
               {message}
             </div>
-
           )}
-
         </section>
 
-        {/* ====================================================
-            FOOTER
-        ==================================================== */}
-
         <footer className="publish-footer">
-
           <button
             type="button"
             className="secondary-button"
@@ -1470,7 +1318,6 @@ export default function PublishPage() {
           </button>
 
           <div className="footer-actions">
-
             <button
               type="button"
               className="secondary-button"
@@ -1500,13 +1347,9 @@ export default function PublishPage() {
                 ? "Publishing..."
                 : "Publish Assessment"}
             </button>
-
           </div>
-
         </footer>
-
       </div>
-
     </main>
   );
 }
@@ -1543,19 +1386,15 @@ function StepperItem({
           : ""
       }`}
     >
-
       <span className="step-number">
-
         {complete
           ? "✓"
           : number}
-
       </span>
 
       <span>
         {label}
       </span>
-
     </div>
   );
 }
@@ -1582,7 +1421,6 @@ function ReadinessItem({
           : "not-ready"
       }`}
     >
-
       <span className="readiness-item-icon">
         {ready
           ? "✓"
@@ -1592,7 +1430,6 @@ function ReadinessItem({
       <span>
         {label}
       </span>
-
     </div>
   );
 }
@@ -1615,7 +1452,6 @@ function PublishField({
 }: PublishFieldProps) {
   return (
     <div className="publish-field">
-
       <span>
         {label}
       </span>
@@ -1623,7 +1459,6 @@ function PublishField({
       <strong>
         {value}
       </strong>
-
     </div>
   );
 }
