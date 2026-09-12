@@ -1,74 +1,138 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import {
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  useParams,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+
+import { API_URL } from "@/src/lib/api/fetcher";
+
 import "./create-question.css";
 
-type TestCaseType = "SAMPLE" | "PUBLIC" | "HIDDEN";
+/* ============================================================
+   TYPES
+   ============================================================ */
+
+type TestCaseType =
+  | "SAMPLE"
+  | "PUBLIC"
+  | "HIDDEN";
 
 interface TestCase {
   id: string;
+
   name: string;
+
   type: TestCaseType;
+
   input: string;
+
   expectedOutput: string;
+
   marks: number;
+
   active: boolean;
 }
 
 interface CodingQuestionForm {
   title: string;
+
   code: string;
+
   language: string;
+
   difficulty: string;
+
   marks: number;
+
   estimatedTime: number;
+
   bloomsLevel: string;
 
   problemStatement: string;
+
   objective: string;
+
   inputFormat: string;
+
   outputFormat: string;
+
   constraints: string;
+
   exampleInput: string;
+
   exampleOutput: string;
+
   explanation: string;
+
   hints: string;
 
   starterCode: string;
+
   referenceSolution: string;
 
   compiler: string;
+
   languageStandard: string;
+
   timeLimitSeconds: number;
+
   memoryLimitMb: number;
+
   networkAccess: boolean;
 
   skill: string;
+
   subskill: string;
+
   topic: string;
+
   tags: string;
 
   aiPolicy: string;
 }
 
+/* ============================================================
+   DEFAULT FORM
+   ============================================================ */
+
 const DEFAULT_FORM: CodingQuestionForm = {
   title: "",
+
   code: "",
+
   language: "C",
+
   difficulty: "BEGINNER",
+
   marks: 10,
+
   estimatedTime: 10,
+
   bloomsLevel: "APPLY",
 
   problemStatement: "",
+
   objective: "",
+
   inputFormat: "",
+
   outputFormat: "",
+
   constraints: "",
+
   exampleInput: "",
+
   exampleOutput: "",
+
   explanation: "",
+
   hints: "",
 
   starterCode: `#include <stdio.h>
@@ -80,54 +144,80 @@ int main() {
     return 0;
 }
 `,
+
   referenceSolution: "",
 
   compiler: "GCC",
+
   languageStandard: "C17",
+
   timeLimitSeconds: 2,
+
   memoryLimitMb: 256,
+
   networkAccess: false,
 
   skill: "",
+
   subskill: "",
+
   topic: "",
+
   tags: "",
 
   aiPolicy: "DISABLED",
 };
 
+/* ============================================================
+   PAGE
+   ============================================================ */
+
 export default function CreateQuestionPage() {
-  const router = useRouter();
-  const params = useParams();
-  const searchParams = useSearchParams();
+  const router =
+    useRouter();
+
+  const params =
+    useParams();
+
+  const searchParams =
+    useSearchParams();
 
   const assessmentId =
     params.assessmentId as string;
 
   const sectionId =
-    searchParams.get("sectionId");
+    searchParams.get(
+      "sectionId",
+    );
 
   const [
     form,
     setForm,
-  ] = useState<CodingQuestionForm>(
-    DEFAULT_FORM,
-  );
+  ] =
+    useState<CodingQuestionForm>(
+      DEFAULT_FORM,
+    );
 
   const [
     testCases,
     setTestCases,
-  ] = useState<TestCase[]>([
-    createEmptyTestCase(
-      "SAMPLE",
-      1,
-    ),
-  ]);
+  ] =
+    useState<TestCase[]>([
+      createEmptyTestCase(
+        "SAMPLE",
+        1,
+      ),
+    ]);
 
   const [
     errors,
     setErrors,
-  ] = useState<string[]>([]);
+  ] =
+    useState<string[]>([]);
+
+  /* ============================================================
+     CALCULATIONS
+     ============================================================ */
 
   const totalTestCaseMarks =
     useMemo(() => {
@@ -144,6 +234,10 @@ export default function CreateQuestionPage() {
       );
     }, [testCases]);
 
+  /* ============================================================
+     FORM UPDATE
+     ============================================================ */
+
   function updateForm<
     K extends keyof CodingQuestionForm,
   >(
@@ -158,10 +252,15 @@ export default function CreateQuestionPage() {
     );
   }
 
+  /* ============================================================
+     TEST CASES
+     ============================================================ */
+
   function addTestCase() {
     setTestCases(
       (current) => [
         ...current,
+
         createEmptyTestCase(
           "HIDDEN",
           current.length + 1,
@@ -206,8 +305,10 @@ export default function CreateQuestionPage() {
 
     const duplicate: TestCase = {
       ...existing,
+
       id:
         crypto.randomUUID(),
+
       name:
         `${existing.name} Copy`,
     };
@@ -231,6 +332,10 @@ export default function CreateQuestionPage() {
         ),
     );
   }
+
+  /* ============================================================
+     VALIDATION
+     ============================================================ */
 
   function validateQuestion() {
     const validationErrors:
@@ -318,43 +423,17 @@ export default function CreateQuestionPage() {
     );
   }
 
-  // function saveDraft() {
-  //   const draft = {
-  //     id:
-  //       crypto.randomUUID(),
-  //     assessmentId,
-  //     sectionId,
-  //     type: "CODING",
-  //     ...form,
-  //     testCases,
-  //     status: "DRAFT",
-  //     updatedAt:
-  //       new Date().toISOString(),
-  //   };
-
-  //   sessionStorage.setItem(
-  //     `codingQuestionDraft:${assessmentId}`,
-  //     JSON.stringify(
-  //       draft,
-  //     ),
-  //   );
-
-  //   alert(
-  //     "Question draft saved.",
-  //   );
-  // }
+  /* ============================================================
+     SAVE QUESTION
+     ============================================================ */
 
   async function saveQuestion() {
-
     if (!validateQuestion()) {
       return;
     }
 
-
     try {
-
       const payload = {
-
         assessmentId,
 
         sectionId,
@@ -365,18 +444,21 @@ export default function CreateQuestionPage() {
         createdByUserId:
           "DEFAULT_USER",
 
-
         form: {
+          title:
+            form.title,
 
-          title: form.title,
+          code:
+            form.code,
 
-          code: form.code,
+          language:
+            form.language,
 
-          language: form.language,
+          difficulty:
+            form.difficulty,
 
-          difficulty: form.difficulty,
-
-          marks: form.marks,
+          marks:
+            form.marks,
 
           problemStatement:
             form.problemStatement,
@@ -410,119 +492,113 @@ export default function CreateQuestionPage() {
 
           aiPolicy:
             form.aiPolicy,
-
         },
-
 
         testCases:
           testCases.map(
-            (tc, index) => ({
-
+            (
+              testCase,
+              index,
+            ) => ({
               name:
-                tc.name,
+                testCase.name,
 
               type:
-                tc.type,
+                testCase.type,
 
               input:
-                tc.input,
+                testCase.input,
 
               expectedOutput:
-                tc.expectedOutput,
+                testCase.expectedOutput,
 
               marks:
-                tc.marks,
+                testCase.marks,
 
               sequence:
                 index + 1,
 
               active:
-                tc.active,
-
+                testCase.active,
             }),
           ),
-
       };
 
+      /* ========================================================
+         IMPORTANT:
+         USE SHARED API_URL
+         ======================================================== */
 
       const response =
         await fetch(
-          "http://localhost:3001/questions/coding",
+          `${API_URL}/questions/coding`,
           {
-
             method:
               "POST",
 
             headers: {
-
               "Content-Type":
                 "application/json",
-
             },
 
             body:
-              JSON.stringify(payload),
-
+              JSON.stringify(
+                payload,
+              ),
           },
         );
 
-
       if (!response.ok) {
-
         const message =
           await response.text();
 
         console.error(
+          "Question creation API error:",
           message,
         );
 
         throw new Error(
           "Question creation failed",
         );
-
       }
-
 
       const result =
         await response.json();
-
 
       console.log(
         "Question saved:",
         result,
       );
 
-
       router.push(
         `/assessments/${assessmentId}/questions`,
       );
-
-
-    }
-    catch(error) {
-
+    } catch (error) {
       console.error(
+        "Unable to save question:",
         error,
       );
 
       alert(
         "Unable to save question",
       );
-
     }
-
   }
 
+  /* ============================================================
+     UI
+     ============================================================ */
 
   return (
     <main className="create-question-page">
-
       <div className="create-question-container">
 
+        {/* ======================================================
+            HEADER
+        ====================================================== */}
+
         <header className="create-question-header">
-
           <div>
-
             <button
               type="button"
               className="back-link"
@@ -550,17 +626,18 @@ export default function CreateQuestionPage() {
               starter code, test cases,
               evaluation and runtime.
             </p>
-
           </div>
 
           <div className="question-status">
             DRAFT
           </div>
-
         </header>
 
-        <nav className="authoring-nav">
+        {/* ======================================================
+            AUTHORING NAV
+        ====================================================== */}
 
+        <nav className="authoring-nav">
           <a href="#details">
             1. Details
           </a>
@@ -592,14 +669,16 @@ export default function CreateQuestionPage() {
           <a href="#ai">
             8. AI Policy
           </a>
-
         </nav>
+
+        {/* ======================================================
+            01 — QUESTION DETAILS
+        ====================================================== */}
 
         <section
           className="authoring-card"
           id="details"
         >
-
           <SectionHeading
             number="01"
             title="Question Details"
@@ -607,7 +686,6 @@ export default function CreateQuestionPage() {
           />
 
           <div className="form-grid">
-
             <FormField
               label="Question Title"
               required
@@ -785,16 +863,17 @@ export default function CreateQuestionPage() {
                 </option>
               </select>
             </FormField>
-
           </div>
-
         </section>
+
+        {/* ======================================================
+            02 — PROBLEM
+        ====================================================== */}
 
         <section
           className="authoring-card"
           id="problem"
         >
-
           <SectionHeading
             number="02"
             title="Problem Authoring"
@@ -837,7 +916,6 @@ export default function CreateQuestionPage() {
           </FormField>
 
           <div className="form-grid">
-
             <FormField
               label="Input Format"
               required
@@ -903,11 +981,9 @@ export default function CreateQuestionPage() {
                 }
               />
             </FormField>
-
           </div>
 
           <div className="form-grid">
-
             <FormField label="Example Input">
               <textarea
                 rows={5}
@@ -939,7 +1015,6 @@ export default function CreateQuestionPage() {
                 }
               />
             </FormField>
-
           </div>
 
           <FormField label="Example Explanation">
@@ -956,14 +1031,16 @@ export default function CreateQuestionPage() {
               }
             />
           </FormField>
-
         </section>
+
+        {/* ======================================================
+            03 — CODE
+        ====================================================== */}
 
         <section
           className="authoring-card"
           id="code"
         >
-
           <SectionHeading
             number="03"
             title="Code Configuration"
@@ -971,7 +1048,6 @@ export default function CreateQuestionPage() {
           />
 
           <div className="code-grid">
-
             <FormField label="Starter Code">
               <textarea
                 rows={16}
@@ -1004,18 +1080,18 @@ export default function CreateQuestionPage() {
                 placeholder="Enter the verified reference solution..."
               />
             </FormField>
-
           </div>
-
         </section>
+
+        {/* ======================================================
+            04 — TEST CASES
+        ====================================================== */}
 
         <section
           className="authoring-card"
           id="tests"
         >
-
           <div className="test-case-section-header">
-
             <SectionHeading
               number="04"
               title="Test Case Builder"
@@ -1031,11 +1107,9 @@ export default function CreateQuestionPage() {
             >
               + Add Test Case
             </button>
-
           </div>
 
           <div className="test-summary">
-
             <div>
               <span>
                 Question Marks
@@ -1069,11 +1143,9 @@ export default function CreateQuestionPage() {
                 }
               </strong>
             </div>
-
           </div>
 
           <div className="test-case-list">
-
             {testCases.map(
               (
                 testCase,
@@ -1085,11 +1157,8 @@ export default function CreateQuestionPage() {
                     testCase.id
                   }
                 >
-
                   <header className="test-card-header">
-
                     <div>
-
                       <span className="test-number">
                         TEST CASE{" "}
                         {index + 1}
@@ -1100,11 +1169,9 @@ export default function CreateQuestionPage() {
                           testCase.name
                         }
                       </h3>
-
                     </div>
 
                     <div className="test-actions">
-
                       <button
                         type="button"
                         onClick={() =>
@@ -1131,13 +1198,10 @@ export default function CreateQuestionPage() {
                       >
                         Remove
                       </button>
-
                     </div>
-
                   </header>
 
                   <div className="form-grid">
-
                     <FormField label="Test Case Name">
                       <input
                         value={
@@ -1227,11 +1291,9 @@ export default function CreateQuestionPage() {
                         </option>
                       </select>
                     </FormField>
-
                   </div>
 
                   <div className="form-grid">
-
                     <FormField label="Input">
                       <textarea
                         rows={8}
@@ -1268,22 +1330,21 @@ export default function CreateQuestionPage() {
                         }
                       />
                     </FormField>
-
                   </div>
-
                 </article>
               ),
             )}
-
           </div>
-
         </section>
+
+        {/* ======================================================
+            05 — EVALUATION
+        ====================================================== */}
 
         <section
           className="authoring-card"
           id="evaluation"
         >
-
           <SectionHeading
             number="05"
             title="Evaluation"
@@ -1291,9 +1352,7 @@ export default function CreateQuestionPage() {
           />
 
           <div className="evaluation-grid">
-
             <div className="evaluation-card">
-
               <span>
                 Question Marks
               </span>
@@ -1301,11 +1360,9 @@ export default function CreateQuestionPage() {
               <strong>
                 {form.marks}
               </strong>
-
             </div>
 
             <div className="evaluation-card">
-
               <span>
                 Allocated Test Marks
               </span>
@@ -1315,7 +1372,6 @@ export default function CreateQuestionPage() {
                   totalTestCaseMarks
                 }
               </strong>
-
             </div>
 
             <div
@@ -1326,7 +1382,6 @@ export default function CreateQuestionPage() {
                   : "evaluation-warning"
               }`}
             >
-
               <span>
                 Marks Validation
               </span>
@@ -1337,18 +1392,18 @@ export default function CreateQuestionPage() {
                   ? "Valid"
                   : "Mismatch"}
               </strong>
-
             </div>
-
           </div>
-
         </section>
+
+        {/* ======================================================
+            06 — RUNTIME
+        ====================================================== */}
 
         <section
           className="authoring-card"
           id="runtime"
         >
-
           <SectionHeading
             number="06"
             title="Runtime & Security"
@@ -1356,7 +1411,6 @@ export default function CreateQuestionPage() {
           />
 
           <div className="form-grid">
-
             <FormField label="Compiler">
               <select
                 value={
@@ -1440,11 +1494,9 @@ export default function CreateQuestionPage() {
                 }
               />
             </FormField>
-
           </div>
 
           <label className="toggle-row">
-
             <input
               type="checkbox"
               checked={
@@ -1469,16 +1521,17 @@ export default function CreateQuestionPage() {
                 assessments.
               </span>
             </div>
-
           </label>
-
         </section>
+
+        {/* ======================================================
+            07 — SKILLS
+        ====================================================== */}
 
         <section
           className="authoring-card"
           id="skills"
         >
-
           <SectionHeading
             number="07"
             title="Skills & Metadata"
@@ -1486,7 +1539,6 @@ export default function CreateQuestionPage() {
           />
 
           <div className="form-grid">
-
             <FormField label="Primary Skill">
               <input
                 value={
@@ -1546,16 +1598,17 @@ export default function CreateQuestionPage() {
                 placeholder="arrays, loops, beginner"
               />
             </FormField>
-
           </div>
-
         </section>
+
+        {/* ======================================================
+            08 — AI
+        ====================================================== */}
 
         <section
           className="authoring-card"
           id="ai"
         >
-
           <SectionHeading
             number="08"
             title="AI Assistance Policy"
@@ -1563,7 +1616,6 @@ export default function CreateQuestionPage() {
           />
 
           <div className="form-grid">
-
             <FormField label="AI Assistance">
               <select
                 value={
@@ -1597,37 +1649,40 @@ export default function CreateQuestionPage() {
                 </option>
               </select>
             </FormField>
-
           </div>
-
         </section>
+
+        {/* ======================================================
+            ERRORS
+        ====================================================== */}
 
         {errors.length >
           0 && (
           <section className="error-panel">
-
             <strong>
               Please correct the
               following:
             </strong>
 
             <ul>
-
               {errors.map(
                 (error) => (
-                  <li key={error}>
+                  <li
+                    key={error}
+                  >
                     {error}
                   </li>
                 ),
               )}
-
             </ul>
-
           </section>
         )}
 
-        <footer className="create-question-footer">
+        {/* ======================================================
+            FOOTER
+        ====================================================== */}
 
+        <footer className="create-question-footer">
           <button
             type="button"
             className="secondary-button"
@@ -1641,17 +1696,6 @@ export default function CreateQuestionPage() {
           </button>
 
           <div>
-
-            {/* <button
-              type="button"
-              className="secondary-button"
-              onClick={
-                saveDraft
-              }
-            >
-              Save Draft
-            </button> */}
-
             <button
               type="button"
               className="primary-button"
@@ -1661,16 +1705,16 @@ export default function CreateQuestionPage() {
             >
               Save Question
             </button>
-
           </div>
-
         </footer>
-
       </div>
-
     </main>
   );
 }
+
+/* ============================================================
+   CREATE EMPTY TEST CASE
+   ============================================================ */
 
 function createEmptyTestCase(
   type: TestCaseType,
@@ -1698,9 +1742,15 @@ function createEmptyTestCase(
   };
 }
 
+/* ============================================================
+   SECTION HEADING
+   ============================================================ */
+
 interface SectionHeadingProps {
   number: string;
+
   title: string;
+
   description: string;
 }
 
@@ -1711,13 +1761,11 @@ function SectionHeading({
 }: SectionHeadingProps) {
   return (
     <div className="section-heading">
-
       <div className="section-number">
         {number}
       </div>
 
       <div>
-
         <h2>
           {title}
         </h2>
@@ -1725,16 +1773,20 @@ function SectionHeading({
         <p>
           {description}
         </p>
-
       </div>
-
     </div>
   );
 }
 
+/* ============================================================
+   FORM FIELD
+   ============================================================ */
+
 interface FormFieldProps {
   label: string;
+
   required?: boolean;
+
   children: React.ReactNode;
 }
 
@@ -1745,7 +1797,6 @@ function FormField({
 }: FormFieldProps) {
   return (
     <label className="form-field">
-
       <span>
         {label}
 
@@ -1755,7 +1806,6 @@ function FormField({
       </span>
 
       {children}
-
     </label>
   );
 }
