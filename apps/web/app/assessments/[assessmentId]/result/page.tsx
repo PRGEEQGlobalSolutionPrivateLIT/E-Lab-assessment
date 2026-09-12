@@ -1,7 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  useParams,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
+
+import { API_URL } from "@/src/lib/api/fetcher";
+
+/* ============================================================
+   TYPES
+   ============================================================ */
 
 type ResultData = {
   attemptId: string;
@@ -25,31 +39,47 @@ type ResultData = {
   submittedAt?: string;
 };
 
+/* ============================================================
+   PAGE
+   ============================================================ */
+
 export default function AssessmentResultPage() {
   const params = useParams();
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const assessmentId = String(params.assessmentId);
+  const router = useRouter();
+
+  const searchParams =
+    useSearchParams();
+
+  const assessmentId =
+    String(
+      params.assessmentId,
+    );
 
   const attemptId =
-    searchParams.get("attemptId") || "";
+    searchParams.get(
+      "attemptId",
+    ) || "";
 
   const mode =
-    searchParams.get("mode") || "learner";
-
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:3001";
+    searchParams.get(
+      "mode",
+    ) || "learner";
 
   const [result, setResult] =
-    useState<ResultData | null>(null);
+    useState<ResultData | null>(
+      null,
+    );
 
   const [loading, setLoading] =
     useState(true);
 
   const [error, setError] =
     useState("");
+
+  /* ============================================================
+     LOAD RESULT
+     ============================================================ */
 
   useEffect(() => {
     if (!attemptId) {
@@ -63,31 +93,89 @@ export default function AssessmentResultPage() {
     }
 
     loadResult();
-  }, [attemptId]);
+  }, [
+    attemptId,
+    assessmentId,
+  ]);
 
   async function loadResult() {
     try {
       setLoading(true);
+
       setError("");
 
-      const response = await fetch(
-        `${API_URL}/assessment-attempt/${attemptId}/result`,
-        {
-          cache: "no-store",
-        },
-      );
+      const response =
+        await fetch(
+          `${API_URL}/assessment-attempt/${attemptId}/result`,
+          {
+            method:
+              "GET",
+
+            cache:
+              "no-store",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+          },
+        );
 
       if (!response.ok) {
-        const text = await response.text();
+        const text =
+          await response.text();
+
+        let message =
+          `Unable to load result. HTTP ${response.status}`;
+
+        if (
+          text.trim()
+        ) {
+          try {
+            const parsed =
+              JSON.parse(text);
+
+            if (
+              Array.isArray(
+                parsed?.message,
+              )
+            ) {
+              message =
+                parsed.message.join(
+                  "; ",
+                );
+            } else if (
+              parsed?.message
+            ) {
+              message =
+                parsed.message;
+            } else if (
+              parsed?.error
+            ) {
+              message =
+                parsed.error;
+            } else {
+              message =
+                text;
+            }
+          } catch {
+            message =
+              text;
+          }
+        }
 
         throw new Error(
-          text ||
-            `Unable to load result. HTTP ${response.status}`,
+          message,
         );
       }
 
       const data =
         await response.json();
+
+      console.log(
+        "Assessment Result:",
+        data,
+      );
 
       /*
        * Backend may return:
@@ -95,101 +183,140 @@ export default function AssessmentResultPage() {
        * {
        *   attemptId,
        *   assessmentId,
-       *   assessmentTitle,
-       *   totalQuestions,
-       *   attemptedQuestions,
-       *   totalMarks,
-       *   obtainedMarks,
-       *   percentage,
-       *   passed
+       *   ...
        * }
        *
        * OR:
        *
        * {
-       *   result: {...}
+       *   result: {
+       *     ...
+       *   }
        * }
        */
 
       const resultData =
-        data?.result ?? data;
+        data?.result ??
+        data;
+
+      const totalMarks =
+        Number(
+          resultData?.totalMarks ??
+            0,
+        );
+
+      const obtainedMarks =
+        Number(
+          resultData?.obtainedMarks ??
+            resultData?.score ??
+            resultData?.totalScore ??
+            0,
+        );
+
+      let percentage =
+        Number(
+          resultData?.percentage ??
+            0,
+        );
+
+      /*
+       * If backend does not send percentage,
+       * calculate it from marks.
+       */
+
+      if (
+        !Number.isFinite(
+          percentage,
+        ) &&
+        totalMarks > 0
+      ) {
+        percentage =
+          (obtainedMarks /
+            totalMarks) *
+          100;
+      }
 
       setResult({
         attemptId:
-          resultData.attemptId ??
+          resultData?.attemptId ??
           attemptId,
 
         assessmentId:
-          resultData.assessmentId ??
+          resultData?.assessmentId ??
           assessmentId,
 
         assessmentTitle:
-          resultData.assessmentTitle ??
-          resultData.title ??
+          resultData?.assessmentTitle ??
+          resultData?.title ??
           "Assessment Result",
 
         status:
-          resultData.status ??
+          resultData?.status ??
           "SUBMITTED",
 
         totalQuestions:
           Number(
-            resultData.totalQuestions ??
-              resultData.questionCount ??
+            resultData?.totalQuestions ??
+              resultData?.questionCount ??
               0,
           ),
 
         attemptedQuestions:
           Number(
-            resultData.attemptedQuestions ??
-              resultData.answeredQuestions ??
+            resultData?.attemptedQuestions ??
+              resultData?.answeredQuestions ??
               0,
           ),
 
-        totalMarks:
-          Number(
-            resultData.totalMarks ??
-              0,
-          ),
+        totalMarks,
 
-        obtainedMarks:
-          Number(
-            resultData.obtainedMarks ??
-              resultData.score ??
-              resultData.totalScore ??
-              0,
-          ),
+        obtainedMarks,
 
-        percentage:
-          Number(
-            resultData.percentage ??
-              0,
-          ),
+        percentage,
 
         passed:
-          resultData.passed ??
-          undefined,
+          typeof resultData?.passed ===
+          "boolean"
+            ? resultData.passed
+            : undefined,
 
         startedAt:
-          resultData.startedAt,
+          resultData?.startedAt,
 
         submittedAt:
-          resultData.submittedAt,
+          resultData?.submittedAt,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error(
         "RESULT LOAD ERROR:",
         err,
       );
 
-      setError(
-        err?.message ||
-          "Unable to load assessment result.",
-      );
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to load assessment result.";
+
+      if (
+        message ===
+        "Failed to fetch"
+      ) {
+        setError(
+          `Unable to connect to the assessment API at ${API_URL}.\n\nMake sure the NestJS API is running and CORS is enabled.`,
+        );
+      } else {
+        setError(
+          message,
+        );
+      }
     } finally {
       setLoading(false);
     }
   }
+
+  /* ============================================================
+     FORMAT DATE
+     ============================================================ */
 
   function formatDate(
     value?: string,
@@ -212,6 +339,10 @@ export default function AssessmentResultPage() {
     return date.toLocaleString();
   }
 
+  /* ============================================================
+     SCORE
+     ============================================================ */
+
   function getScorePercentage() {
     if (!result) {
       return 0;
@@ -222,20 +353,31 @@ export default function AssessmentResultPage() {
         result.percentage,
       )
     ) {
-      return result.percentage;
+      return Math.max(
+        0,
+        Math.min(
+          100,
+          result.percentage,
+        ),
+      );
     }
 
     if (
       result.totalMarks > 0
     ) {
       return (
-        result.obtainedMarks /
-        result.totalMarks
-      ) * 100;
+        (result.obtainedMarks /
+          result.totalMarks) *
+        100
+      );
     }
 
     return 0;
   }
+
+  /* ============================================================
+     STATUS
+     ============================================================ */
 
   function getResultStatus() {
     if (!result) {
@@ -260,32 +402,33 @@ export default function AssessmentResultPage() {
     );
   }
 
-  /*
-   * ----------------------------------------------------
-   * LOADING
-   * ----------------------------------------------------
-   */
+  /* ============================================================
+     LOADING
+     ============================================================ */
 
   if (loading) {
     return (
       <main className="min-h-screen bg-[#e9eef5] flex items-center justify-center text-[#25324b]">
         <div className="rounded-3xl bg-[#e9eef5] px-10 py-8 font-bold shadow-[9px_9px_18px_#c7ccd3,-9px_-9px_18px_#ffffff]">
-          Calculating your result...
+          Calculating your
+          result...
         </div>
       </main>
     );
   }
 
-  /*
-   * ----------------------------------------------------
-   * ERROR
-   * ----------------------------------------------------
-   */
+  /* ============================================================
+     ERROR
+     ============================================================ */
 
-  if (error || !result) {
+  if (
+    error ||
+    !result
+  ) {
     return (
       <main className="min-h-screen bg-[#e9eef5] p-8 flex items-center justify-center text-[#25324b]">
         <div className="w-full max-w-xl rounded-3xl bg-[#e9eef5] p-8 shadow-[9px_9px_18px_#c7ccd3,-9px_-9px_18px_#ffffff]">
+
           <h1 className="text-2xl font-bold">
             Result Unavailable
           </h1>
@@ -295,21 +438,40 @@ export default function AssessmentResultPage() {
               "Assessment result could not be loaded."}
           </p>
 
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                `/assessments/${assessmentId}/test`,
-              )
-            }
-            className="mt-6 rounded-xl bg-[#24579a] px-6 py-3 font-bold text-white"
-          >
-            Return to Test
-          </button>
+          <div className="flex gap-3 mt-6">
+
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/assessments/${assessmentId}/test`,
+                )
+              }
+              className="rounded-xl bg-[#24579a] px-6 py-3 font-bold text-white"
+            >
+              Return to Test
+            </button>
+
+            <button
+              type="button"
+              onClick={
+                loadResult
+              }
+              className="rounded-xl px-6 py-3 font-bold bg-[#e9eef5] shadow-[5px_5px_10px_#c7ccd3,-5px_-5px_10px_#ffffff]"
+            >
+              Try Again
+            </button>
+
+          </div>
+
         </div>
       </main>
     );
   }
+
+  /* ============================================================
+     RESULT VALUES
+     ============================================================ */
 
   const percentage =
     getScorePercentage();
@@ -318,32 +480,44 @@ export default function AssessmentResultPage() {
     getResultStatus();
 
   const isPassed =
-    result.passed === true ||
-    status === "PASSED";
+    result.passed ===
+      true ||
+    status ===
+      "PASSED";
 
   return (
     <main className="min-h-screen bg-[#e9eef5] p-6 md:p-8 text-[#25324b]">
+
       <div className="max-w-6xl mx-auto">
 
-        {/* HEADER */}
+        {/* ======================================================
+            HEADER
+        ====================================================== */}
 
         <header className="rounded-3xl bg-[#e9eef5] p-7 md:p-9 mb-6 shadow-[9px_9px_18px_#c7ccd3,-9px_-9px_18px_#ffffff]">
 
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
 
             <div>
+
               <p className="text-sm font-bold text-[#24579a]">
-                ASSESSMENT COMPLETED
+                ASSESSMENT
+                COMPLETED
               </p>
 
               <h1 className="mt-2 text-3xl md:text-4xl font-bold">
-                {result.assessmentTitle}
+                {
+                  result.assessmentTitle
+                }
               </h1>
 
               <p className="mt-2 text-sm text-gray-500">
-                Your assessment has been successfully
+                Your assessment
+                has been
+                successfully
                 submitted.
               </p>
+
             </div>
 
             <div
@@ -369,8 +543,9 @@ export default function AssessmentResultPage() {
 
         </header>
 
-
-        {/* SCORE */}
+        {/* ======================================================
+            SCORE
+        ====================================================== */}
 
         <section className="rounded-3xl bg-[#e9eef5] p-8 mb-6 shadow-[9px_9px_18px_#c7ccd3,-9px_-9px_18px_#ffffff]">
 
@@ -383,21 +558,30 @@ export default function AssessmentResultPage() {
               <div className="w-44 h-44 rounded-full bg-[#e9eef5] flex flex-col items-center justify-center shadow-[inset_8px_8px_16px_#c7ccd3,inset_-8px_-8px_16px_#ffffff]">
 
                 <span className="text-4xl font-bold">
-                  {result.obtainedMarks}
+                  {
+                    result.obtainedMarks
+                  }
                 </span>
 
                 <span className="text-sm text-gray-500 mt-1">
-                  / {result.totalMarks}
+                  /{" "}
+                  {
+                    result.totalMarks
+                  }
                 </span>
 
               </div>
 
               <p className="mt-5 text-lg font-bold">
-                {percentage.toFixed(2)}%
+                {
+                  percentage.toFixed(
+                    2,
+                  )
+                }
+                %
               </p>
 
             </div>
-
 
             {/* SUMMARY */}
 
@@ -405,38 +589,30 @@ export default function AssessmentResultPage() {
 
               <ResultCard
                 title="Total Questions"
-                value={
-                  String(
-                    result.totalQuestions,
-                  )
-                }
+                value={String(
+                  result.totalQuestions,
+                )}
               />
 
               <ResultCard
                 title="Questions Attempted"
-                value={
-                  String(
-                    result.attemptedQuestions,
-                  )
-                }
+                value={String(
+                  result.attemptedQuestions,
+                )}
               />
 
               <ResultCard
                 title="Total Marks"
-                value={
-                  String(
-                    result.totalMarks,
-                  )
-                }
+                value={String(
+                  result.totalMarks,
+                )}
               />
 
               <ResultCard
                 title="Marks Obtained"
-                value={
-                  String(
-                    result.obtainedMarks,
-                  )
-                }
+                value={String(
+                  result.obtainedMarks,
+                )}
               />
 
             </div>
@@ -445,8 +621,9 @@ export default function AssessmentResultPage() {
 
         </section>
 
-
-        {/* SCORE DETAILS */}
+        {/* ======================================================
+            SCORE DETAILS
+        ====================================================== */}
 
         <section className="rounded-3xl bg-[#e9eef5] p-7 mb-6 shadow-[8px_8px_16px_#c7ccd3,-8px_-8px_16px_#ffffff]">
 
@@ -472,21 +649,31 @@ export default function AssessmentResultPage() {
             />
 
             <SummaryRow
-              label="Started At"
+              label="Assessment ID"
               value={
-                formatDate(
-                  result.startedAt,
-                )
+                result.assessmentId
               }
             />
 
             <SummaryRow
-              label="Submitted At"
+              label="Mode"
               value={
-                formatDate(
-                  result.submittedAt,
-                )
+                mode
               }
+            />
+
+            <SummaryRow
+              label="Started At"
+              value={formatDate(
+                result.startedAt,
+              )}
+            />
+
+            <SummaryRow
+              label="Submitted At"
+              value={formatDate(
+                result.submittedAt,
+              )}
             />
 
             <SummaryRow
@@ -500,8 +687,9 @@ export default function AssessmentResultPage() {
 
         </section>
 
-
-        {/* SCORE MESSAGE */}
+        {/* ======================================================
+            RESULT MESSAGE
+        ====================================================== */}
 
         <section className="rounded-3xl bg-[#e9eef5] p-7 mb-6 shadow-[8px_8px_16px_#c7ccd3,-8px_-8px_16px_#ffffff]">
 
@@ -513,18 +701,32 @@ export default function AssessmentResultPage() {
 
             {isPassed
               ? "Congratulations! You have successfully completed the assessment."
-              : result.passed === false
-              ? "The assessment has been completed. Please review your performance and continue improving your skills."
-              : "Your assessment has been submitted successfully. The final score is shown above."}
+              : result.passed ===
+                  false
+                ? "The assessment has been completed. Please review your performance and continue improving your skills."
+                : "Your assessment has been submitted successfully. The final score is shown above."}
 
           </p>
 
         </section>
 
+        {/* ======================================================
+            ACTIONS
+        ====================================================== */}
 
-        {/* ACTIONS */}
+        <div className="flex justify-center gap-4">
 
-        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() =>
+              router.push(
+                `/assessments`,
+              )
+            }
+            className="rounded-xl px-7 py-3 font-bold bg-[#e9eef5] shadow-[6px_6px_12px_#c7ccd3,-6px_-6px_12px_#ffffff]"
+          >
+            Assessments
+          </button>
 
           <button
             type="button"
@@ -545,12 +747,9 @@ export default function AssessmentResultPage() {
   );
 }
 
-
-/*
-========================================================
-RESULT CARD
-========================================================
-*/
+/* ============================================================
+   RESULT CARD
+   ============================================================ */
 
 function ResultCard({
   title,
@@ -574,12 +773,9 @@ function ResultCard({
   );
 }
 
-
-/*
-========================================================
-SUMMARY ROW
-========================================================
-*/
+/* ============================================================
+   SUMMARY ROW
+   ============================================================ */
 
 function SummaryRow({
   label,
