@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 
 import "./create-assessment.css";
 
-import { API_URL } from "@/src/lib/api/fetcher";
-
+import { API_URL } from "@/lib/api/fetcher";
 /* ============================================================
    TYPES
    ============================================================ */
