@@ -11,7 +11,13 @@ import {
   useRouter,
 } from "next/navigation";
 
+import { API_URL } from "@/src/lib/api/fetcher";
+
 import "./questions.css";
+
+/* ============================================================
+   TYPES
+   ============================================================ */
 
 type QuestionType =
   | "CODING"
@@ -55,12 +61,14 @@ interface AssessmentQuestion {
   sequence: number;
 }
 
-export default function AssessmentQuestionsPage() {
-  const router =
-    useRouter();
+/* ============================================================
+   PAGE
+   ============================================================ */
 
-  const params =
-    useParams();
+export default function AssessmentQuestionsPage() {
+  const router = useRouter();
+
+  const params = useParams();
 
   const assessmentId =
     params.assessmentId as string;
@@ -72,14 +80,16 @@ export default function AssessmentQuestionsPage() {
     useState<AssessmentDraft | null>(
       null,
     );
-const [
+
+  const [
     questions,
     setQuestions,
   ] =
     useState<AssessmentQuestion[]>(
       [],
     );
-const [
+
+  const [
     showAddQuestion,
     setShowAddQuestion,
   ] =
@@ -93,126 +103,93 @@ const [
       [],
     );
 
-  // const [
-  //   saved,
-  //   setSaved,
-  // ] =
-  //   useState(false);
+  /* ============================================================
+     LOAD DATA
+     ============================================================ */
 
-  /*
-  ============================================================
-  LOAD DATA
-  ============================================================
-  */
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const response =
+          await fetch(
+            `${API_URL}/assessment/${assessmentId}`,
+          );
 
- useEffect(() => {
+        if (!response.ok) {
+          throw new Error(
+            "Assessment not found",
+          );
+        }
 
-  async function loadData() {
-
-    try {
-
-      const response =
-        await fetch(
-          `http://localhost:3001/assessment/${assessmentId}`
-        );
-
-
-      if(!response.ok){
-
-        throw new Error(
-          "Assessment not found"
-        );
-
-      }
-
-
-      const data =
-        await response.json();
-
-
-      console.log(
-        "Loaded Assessment:",
-        data
-      );
-
-
-      setAssessment({
-
-        id:data.id,
-
-        title:data.title,
-
-        code:data.code,
-
-        plannedQuestions:
-          data.plannedQuestions,
-
-        totalMarks:
-          data.totalMarks,
-
-        durationMinutes:
-          data.durationMinutes,
-
-        technology:
-          data.technology,
-
-        difficulty:
-          data.difficulty
-
-      });
-
-
-
-      const questionResponse =
-        await fetch(
-          `http://localhost:3001/questions/assessment/${assessmentId}`
-        );
-
-
-      if(questionResponse.ok){
-
-        const questionList =
-          await questionResponse.json();
-
+        const data =
+          await response.json();
 
         console.log(
-          "Loaded Questions:",
-          questionList
+          "Loaded Assessment:",
+          data,
         );
 
+        setAssessment({
+          id: data.id,
 
-        setQuestions(
-          questionList
+          title: data.title,
+
+          code: data.code,
+
+          plannedQuestions:
+            data.plannedQuestions,
+
+          totalMarks:
+            data.totalMarks,
+
+          durationMinutes:
+            data.durationMinutes,
+
+          technology:
+            data.technology,
+
+          difficulty:
+            data.difficulty,
+        });
+
+        const questionResponse =
+          await fetch(
+            `${API_URL}/questions/assessment/${assessmentId}`,
+          );
+
+        if (questionResponse.ok) {
+          const questionList =
+            await questionResponse.json();
+
+          console.log(
+            "Loaded Questions:",
+            questionList,
+          );
+
+          setQuestions(
+            Array.isArray(
+              questionList,
+            )
+              ? questionList
+              : [],
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Loading failed:",
+          error,
         );
-
       }
-
-
-    }
-    catch(error){
-
-      console.error(
-        "Loading failed:",
-        error
-      );
-
     }
 
-  }
+    if (assessmentId) {
+      loadData();
+    }
+  }, [assessmentId]);
 
-
-  loadData();
-
-
-},[
-  assessmentId
-]);
-
-  /*
-  ============================================================
-  SUMMARY CALCULATIONS
-  ============================================================
-  */
+  /* ============================================================
+     SUMMARY CALCULATIONS
+     ============================================================ */
 
   const totalAddedQuestions =
     questions.length;
@@ -268,11 +245,9 @@ const [
       0,
     );
 
-  /*
-  ============================================================
-  SAVE
-  ============================================================
-  */
+  /* ============================================================
+     SAVE
+     ============================================================ */
 
   function saveQuestions() {
     sessionStorage.setItem(
@@ -281,25 +256,17 @@ const [
         questions,
       ),
     );
-
-    // setSaved(
-    //   true,
-    // );
   }
 
-  /*
-  ============================================================
-  VALIDATION
-  ============================================================
-  */
+  /* ============================================================
+     VALIDATION
+     ============================================================ */
 
   function validateQuestions() {
     const validationErrors:
       string[] = [];
 
-    if (
-      !assessment
-    ) {
+    if (!assessment) {
       validationErrors.push(
         "Assessment details are missing.",
       );
@@ -341,12 +308,10 @@ const [
     );
   }
 
-  /*
-  ============================================================
-  SAVE + CONTINUE
-  QUESTIONS -> SCORING & RULES
-  ============================================================
-  */
+  /* ============================================================
+     SAVE + CONTINUE
+     QUESTIONS -> SCORING & RULES
+     ============================================================ */
 
   function saveAndContinue() {
     saveQuestions();
@@ -362,11 +327,9 @@ const [
     );
   }
 
-  /*
-  ============================================================
-  ADD QUESTION
-  ============================================================
-  */
+  /* ============================================================
+     ADD QUESTION
+     ============================================================ */
 
   function openAddQuestion() {
     setShowAddQuestion(
@@ -384,11 +347,9 @@ const [
     );
   }
 
-  /*
-  ============================================================
-  DIRECT QUESTION TYPE ROUTING
-  ============================================================
-  */
+  /* ============================================================
+     DIRECT QUESTION TYPE ROUTING
+     ============================================================ */
 
   function createNewQuestion(
     type: QuestionType,
@@ -432,11 +393,9 @@ const [
     }
   }
 
-  /*
-  ============================================================
-  OTHER QUESTION SOURCES
-  ============================================================
-  */
+  /* ============================================================
+     OTHER QUESTION SOURCES
+     ============================================================ */
 
   function openQuestionBank() {
     saveQuestions();
@@ -474,11 +433,9 @@ const [
     );
   }
 
-  /*
-  ============================================================
-  EDIT
-  ============================================================
-  */
+  /* ============================================================
+     EDIT
+     ============================================================ */
 
   function editQuestion(
     question:
@@ -498,7 +455,8 @@ const [
       "mode",
       "edit",
     );
-const suffix =
+
+    const suffix =
       `?${query.toString()}`;
 
     switch (
@@ -536,11 +494,9 @@ const suffix =
     }
   }
 
-  /*
-  ============================================================
-  MARKS
-  ============================================================
-  */
+  /* ============================================================
+     MARKS
+     ============================================================ */
 
   function updateMarks(
     id: string,
@@ -571,20 +527,14 @@ const suffix =
         ),
     );
 
-    // setSaved(
-    //   false,
-    // );
-
     setErrors(
       [],
     );
   }
 
-  /*
-  ============================================================
-  REMOVE
-  ============================================================
-  */
+  /* ============================================================
+     REMOVE
+     ============================================================ */
 
   function removeQuestion(
     id: string,
@@ -668,20 +618,14 @@ const suffix =
       },
     );
 
-    // setSaved(
-    //   false,
-    // );
-
     setErrors(
       [],
     );
   }
 
-  /*
-  ============================================================
-  DUPLICATE
-  ============================================================
-  */
+  /* ============================================================
+     DUPLICATE
+     ============================================================ */
 
   function duplicateQuestion(
     id: string,
@@ -731,20 +675,14 @@ const suffix =
       ],
     );
 
-    // setSaved(
-    //   false,
-    // );
-
     setErrors(
       [],
     );
   }
 
-  /*
-  ============================================================
-  MOVE
-  ============================================================
-  */
+  /* ============================================================
+     MOVE
+     ============================================================ */
 
   function moveQuestion(
     id: string,
@@ -797,8 +735,7 @@ const suffix =
           1;
 
     if (
-      targetIndex <
-        0 ||
+      targetIndex < 0 ||
       targetIndex >=
         group.length
     ) {
@@ -840,29 +777,19 @@ const suffix =
           },
         ),
     );
-
-    // setSaved(
-    //   false,
-    // );
   }
 
-  /*
-  ============================================================
-  MISSING DATA
-  ============================================================
-  */
+  /* ============================================================
+     MISSING DATA
+     ============================================================ */
 
-  
   if (
- !assessment
+    !assessment
   ) {
     return (
       <main className="questions-page">
-
         <div className="questions-container">
-
           <div className="missing-card">
-
             <h2>
               Assessment data not found
             </h2>
@@ -884,32 +811,24 @@ const suffix =
             >
               Return to Assessments
             </button>
-
           </div>
-
         </div>
-
       </main>
     );
   }
 
-  /*
-  ============================================================
-  UI
-  ============================================================
-  */
+  /* ============================================================
+     UI
+     ============================================================ */
 
   return (
     <main className="questions-page">
-
       <div className="questions-container">
 
         {/* HEADER */}
 
         <header className="page-header">
-
           <div>
-
             <button
               type="button"
               className="back-link"
@@ -935,11 +854,9 @@ const suffix =
               question set and configure
               marks.
             </p>
-
           </div>
 
           <div className="assessment-chip">
-
             <span>
               {
                 assessment.code
@@ -951,15 +868,12 @@ const suffix =
                 assessment.title
               }
             </strong>
-
           </div>
-
         </header>
 
         {/* SIMPLE STEP NAVIGATION */}
 
         <section className="assessment-stepper">
-
           <StepperItem
             number="1"
             label="Setup"
@@ -991,13 +905,11 @@ const suffix =
             number="6"
             label="Publish"
           />
-
         </section>
 
         {/* SUMMARY */}
 
         <section className="progress-panel">
-
           <ProgressMetric
             label="Questions"
             value={`${totalAddedQuestions} / ${assessment.plannedQuestions}`}
@@ -1020,19 +932,14 @@ const suffix =
             label="Duration"
             value={`${assessment.durationMinutes} min`}
           />
-
         </section>
 
         {/* CONTENT */}
 
         <div className="builder-layout">
-
           <section className="workspace-card workspace-full">
-
             <div className="workspace-header">
-
               <div>
-
                 <span className="workspace-label">
                   QUESTION SET
                 </span>
@@ -1051,7 +958,6 @@ const suffix =
                   }
                   {" marks"}
                 </p>
-
               </div>
 
               <button
@@ -1063,13 +969,11 @@ const suffix =
               >
                 + Add Question
               </button>
-
             </div>
 
             {/* LOCAL SUMMARY */}
 
             <div className="workspace-progress">
-
               <div>
                 <span>
                   Questions
@@ -1101,16 +1005,13 @@ const suffix =
                   }
                 </strong>
               </div>
-
             </div>
 
             {/* EMPTY STATE */}
 
             {visibleQuestions.length ===
             0 ? (
-
               <div className="empty-state">
-
                 <h3>
                   No questions yet
                 </h3>
@@ -1129,15 +1030,10 @@ const suffix =
                 >
                   + Add Question
                 </button>
-
               </div>
-
             ) : (
-
               <div className="question-table">
-
                 <div className="question-table-header">
-
                   <span>
                     #
                   </span>
@@ -1157,7 +1053,6 @@ const suffix =
                   <span>
                     Actions
                   </span>
-
                 </div>
 
                 {visibleQuestions.map(
@@ -1165,14 +1060,12 @@ const suffix =
                     question,
                     index,
                   ) => (
-
                     <div
                       key={
                         question.id
                       }
                       className="question-row"
                     >
-
                       <div className="question-number">
                         {
                           index +
@@ -1181,7 +1074,6 @@ const suffix =
                       </div>
 
                       <div className="question-info">
-
                         <strong>
                           {
                             question.title
@@ -1189,7 +1081,6 @@ const suffix =
                         </strong>
 
                         <div className="question-meta">
-
                           <span>
                             {
                               question.technology
@@ -1201,13 +1092,10 @@ const suffix =
                               question.difficulty
                             }
                           </span>
-
                         </div>
-
                       </div>
 
                       <div>
-
                         <span className="type-badge">
                           {
                             formatType(
@@ -1215,11 +1103,9 @@ const suffix =
                             )
                           }
                         </span>
-
                       </div>
 
                       <div className="marks-control">
-
                         <input
                           type="number"
                           min={0}
@@ -1237,11 +1123,9 @@ const suffix =
                             )
                           }
                         />
-
                       </div>
 
                       <div className="row-actions">
-
                         <button
                           type="button"
                           onClick={() =>
@@ -1308,29 +1192,20 @@ const suffix =
                         >
                           Remove
                         </button>
-
                       </div>
-
                     </div>
-
                   ),
                 )}
-
               </div>
-
             )}
-
           </section>
-
         </div>
 
         {/* VALIDATION */}
 
         {errors.length >
           0 && (
-
           <div className="validation-panel">
-
             <strong>
               Complete the question
               configuration before
@@ -1338,7 +1213,6 @@ const suffix =
             </strong>
 
             <ul>
-
               {errors.map(
                 (
                   error,
@@ -1355,47 +1229,37 @@ const suffix =
                   </li>
                 ),
               )}
-
             </ul>
-
           </div>
-
         )}
 
         {/* FOOTER */}
 
         <footer className="sticky-footer">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() =>
+              router.push(
+                `/assessments/${assessmentId}/edit`,
+              )
+            }
+          >
+            ← Back
+          </button>
 
-  <button
-    type="button"
-    className="secondary-button"
-    onClick={() =>
-      router.push(
-        `/assessments/${assessmentId}/edit`,
-      )
-    }
-  >
-    ← Back
-  </button>
-
-
-  <div className="footer-right">
-
-    <button
-      type="button"
-      className="primary-button"
-      onClick={
-        saveAndContinue
-      }
-    >
-      Continue →
-    </button>
-
-  </div>
-
-
-</footer>
-
+          <div className="footer-right">
+            <button
+              type="button"
+              className="primary-button"
+              onClick={
+                saveAndContinue
+              }
+            >
+              Continue →
+            </button>
+          </div>
+        </footer>
       </div>
 
       {/* ====================================================
@@ -1403,7 +1267,6 @@ const suffix =
       ==================================================== */}
 
       {showAddQuestion && (
-
         <div
           className="modal-overlay"
           onMouseDown={(event) => {
@@ -1415,13 +1278,9 @@ const suffix =
             }
           }}
         >
-
           <div className="add-modal">
-
             <div className="modal-header">
-
               <div>
-
                 <span>
                   ADD QUESTION
                 </span>
@@ -1434,7 +1293,6 @@ const suffix =
                   Select a type to start
                   authoring immediately.
                 </p>
-
               </div>
 
               <button
@@ -1446,19 +1304,16 @@ const suffix =
               >
                 ×
               </button>
-
             </div>
 
             {/* PRIMARY TYPES */}
 
             <div className="modal-section">
-
               <span className="modal-section-label">
                 CREATE NEW
               </span>
 
               <div className="type-grid compact">
-
                 <QuestionTypeCard
                   title="Coding"
                   description="Programming problem with test cases."
@@ -1508,21 +1363,17 @@ const suffix =
                     )
                   }
                 />
-
               </div>
-
             </div>
 
             {/* OTHER SOURCES */}
 
             <div className="modal-section">
-
               <span className="modal-section-label">
                 OTHER OPTIONS
               </span>
 
               <div className="source-actions">
-
                 <button
                   type="button"
                   onClick={
@@ -1549,26 +1400,18 @@ const suffix =
                 >
                   Generate with AI
                 </button>
-
               </div>
-
             </div>
-
           </div>
-
         </div>
-
       )}
-
     </main>
   );
 }
 
-/*
-============================================================
-STEPPER ITEM
-============================================================
-*/
+/* ============================================================
+   STEPPER ITEM
+   ============================================================ */
 
 interface StepperItemProps {
   number: string;
@@ -1595,7 +1438,6 @@ function StepperItem({
           : ""
       }`}
     >
-
       <span className="step-number">
         {
           complete
@@ -1609,16 +1451,13 @@ function StepperItem({
           label
         }
       </span>
-
     </div>
   );
 }
 
-/*
-============================================================
-PROGRESS METRIC
-============================================================
-*/
+/* ============================================================
+   PROGRESS METRIC
+   ============================================================ */
 
 interface ProgressMetricProps {
   label: string;
@@ -1639,7 +1478,6 @@ function ProgressMetric({
           : ""
       }`}
     >
-
       <span>
         {
           label
@@ -1651,16 +1489,13 @@ function ProgressMetric({
           value
         }
       </strong>
-
     </div>
   );
 }
 
-/*
-============================================================
-QUESTION TYPE CARD
-============================================================
-*/
+/* ============================================================
+   QUESTION TYPE CARD
+   ============================================================ */
 
 interface QuestionTypeCardProps {
   title: string;
@@ -1681,7 +1516,6 @@ function QuestionTypeCard({
         onClick
       }
     >
-
       <strong>
         {
           title
@@ -1693,16 +1527,13 @@ function QuestionTypeCard({
           description
         }
       </p>
-
     </button>
   );
 }
 
-/*
-============================================================
-FORMATTERS
-============================================================
-*/
+/* ============================================================
+   FORMATTERS
+   ============================================================ */
 
 function formatType(
   type:
