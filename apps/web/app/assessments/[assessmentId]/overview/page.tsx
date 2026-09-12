@@ -11,6 +11,7 @@ import {
   useSearchParams,
 } from "next/navigation";
 
+import { API_URL } from "@/src/lib/api/fetcher";
 
 type Assessment = {
   id: string;
@@ -40,7 +41,6 @@ type Assessment = {
   attemptsAllowed: number;
 };
 
-
 type SecurityPolicy = {
   fullscreenMode: boolean;
 
@@ -52,7 +52,6 @@ type SecurityPolicy = {
 
   microphoneMonitoring: boolean;
 };
-
 
 type StartAttemptResponse = {
   id?: string;
@@ -109,82 +108,53 @@ type ScoringResponse = {
   };
 };
 
-
-
 export default function AssessmentOverviewPage() {
+  const router = useRouter();
 
-  const router =
-    useRouter();
+  const params = useParams();
 
-  const params =
-    useParams();
+  const searchParams = useSearchParams();
 
-  const searchParams =
-    useSearchParams();
-
-
-  const assessmentId =
-    String(
-      params.assessmentId,
-    );
-
+  const assessmentId = String(
+    params.assessmentId,
+  );
 
   const mode =
-    searchParams.get(
-      "mode",
-    ) || "learner";
-
-
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:3001";
-
+    searchParams.get("mode") || "learner";
 
   const [
     assessment,
     setAssessment,
-  ] =
-    useState<Assessment | null>(
-      null,
-    );
-
+  ] = useState<Assessment | null>(
+    null,
+  );
 
   const [
     security,
     setSecurity,
-  ] =
-    useState<SecurityPolicy | null>(
-      null,
-    );
-
+  ] = useState<SecurityPolicy | null>(
+    null,
+  );
 
   const [
     agree,
     setAgree,
-  ] =
-    useState(false);
-
+  ] = useState(false);
 
   const [
     loading,
     setLoading,
-  ] =
-    useState(true);
-
+  ] = useState(true);
 
   const [
     starting,
     setStarting,
-  ] =
-    useState(false);
-
+  ] = useState(false);
 
   const [
     error,
     setError,
-  ] =
-    useState("");
-
+  ] = useState("");
 
   /*
    * Attempt information returned
@@ -194,29 +164,23 @@ export default function AssessmentOverviewPage() {
   const [
     attemptsUsed,
     setAttemptsUsed,
-  ] =
-    useState<number | null>(
-      null,
-    );
-
+  ] = useState<number | null>(
+    null,
+  );
 
   const [
     attemptsRemaining,
     setAttemptsRemaining,
-  ] =
-    useState<number | null>(
-      null,
-    );
-
+  ] = useState<number | null>(
+    null,
+  );
 
   const [
     maxAttempts,
     setMaxAttempts,
-  ] =
-    useState<number | null>(
-      null,
-    );
-
+  ] = useState<number | null>(
+    null,
+  );
 
   /*
    * =====================================================
@@ -225,24 +189,18 @@ export default function AssessmentOverviewPage() {
    */
 
   useEffect(() => {
-
     if (!assessmentId) {
       return;
     }
 
     loadOverview();
-
   }, [assessmentId]);
 
-
   async function loadOverview() {
-
     try {
-
       setLoading(true);
 
       setError("");
-
 
       /*
        * ---------------------------------------------------
@@ -265,61 +223,35 @@ export default function AssessmentOverviewPage() {
           },
         );
 
-
-      if (
-        !assessmentResponse.ok
-      ) {
-
+      if (!assessmentResponse.ok) {
         throw new Error(
           "Assessment not found",
         );
-
       }
-
 
       const assessmentData =
         await assessmentResponse.json();
 
-
-      /*
-       * ---------------------------------------------------
-       * GET MAX ATTEMPTS
-       *
-       * Support the possible names currently
-       * used by the backend.
-       * ---------------------------------------------------
-       */
-
       /*
        * ---------------------------------------------------
        * RESOLVE ATTEMPTS ALLOWED
-       * ---------------------------------------------------
-       *
-       * Attempts Allowed is stored in the scoring
-       * configuration. The assessment endpoint may not
-       * contain this field anymore.
-       *
-       * We still support the old assessment-level fields
-       * as a fallback for backward compatibility.
        * ---------------------------------------------------
        */
 
       let configuredAttempts =
         Number(
           assessmentData.attemptsAllowed ??
-          assessmentData.maxAttempts ??
-          assessmentData.maximumAttempts ??
-          assessmentData.attemptLimit ??
-          0,
+            assessmentData.maxAttempts ??
+            assessmentData.maximumAttempts ??
+            assessmentData.attemptLimit ??
+            0,
         );
-
 
       /*
        * Read the authoritative scoring configuration.
        */
 
       try {
-
         const scoringResponse =
           await fetch(
             `${API_URL}/scoring/${assessmentId}`,
@@ -335,53 +267,46 @@ export default function AssessmentOverviewPage() {
             },
           );
 
-
         if (scoringResponse.ok) {
-
-          const scoringData:
-            ScoringResponse =
+          const scoringData: ScoringResponse =
             await scoringResponse.json();
-
 
           const scoringAttempts =
             Number(
               scoringData.maximumAttempts ??
-              scoringData.maxAttempts ??
-              scoringData.attemptsAllowed ??
-              scoringData.attemptLimit ??
-              scoringData.scoring?.maximumAttempts ??
-              scoringData.scoring?.maxAttempts ??
-              scoringData.scoring?.attemptsAllowed ??
-              scoringData.scoring?.attemptLimit ??
-              scoringData.data?.maximumAttempts ??
-              scoringData.data?.maxAttempts ??
-              scoringData.data?.attemptsAllowed ??
-              scoringData.data?.attemptLimit ??
-              0,
+                scoringData.maxAttempts ??
+                scoringData.attemptsAllowed ??
+                scoringData.attemptLimit ??
+                scoringData.scoring
+                  ?.maximumAttempts ??
+                scoringData.scoring
+                  ?.maxAttempts ??
+                scoringData.scoring
+                  ?.attemptsAllowed ??
+                scoringData.scoring
+                  ?.attemptLimit ??
+                scoringData.data
+                  ?.maximumAttempts ??
+                scoringData.data
+                  ?.maxAttempts ??
+                scoringData.data
+                  ?.attemptsAllowed ??
+                scoringData.data
+                  ?.attemptLimit ??
+                0,
             );
 
-
-          if (
-            scoringAttempts > 0
-          ) {
-
+          if (scoringAttempts > 0) {
             configuredAttempts =
               scoringAttempts;
-
           }
-
         }
-
-      }
-      catch (scoringError) {
-
+      } catch (scoringError) {
         console.warn(
           "Unable to load scoring configuration:",
           scoringError,
         );
-
       }
-
 
       setMaxAttempts(
         configuredAttempts > 0
@@ -389,17 +314,12 @@ export default function AssessmentOverviewPage() {
           : null,
       );
 
-
       setAssessment({
+        id: assessmentData.id,
 
-        id:
-          assessmentData.id,
+        title: assessmentData.title,
 
-        title:
-          assessmentData.title,
-
-        code:
-          assessmentData.code,
+        code: assessmentData.code,
 
         description:
           assessmentData.description ??
@@ -417,29 +337,24 @@ export default function AssessmentOverviewPage() {
           assessmentData.difficulty ??
           null,
 
-        plannedQuestions:
-          Number(
-            assessmentData.plannedQuestions ??
+        plannedQuestions: Number(
+          assessmentData.plannedQuestions ??
             0,
-          ),
+        ),
 
-        totalMarks:
-          Number(
-            assessmentData.totalMarks ??
+        totalMarks: Number(
+          assessmentData.totalMarks ??
             0,
-          ),
+        ),
 
-        durationMinutes:
-          Number(
-            assessmentData.durationMinutes ??
+        durationMinutes: Number(
+          assessmentData.durationMinutes ??
             0,
-          ),
+        ),
 
         attemptsAllowed:
           configuredAttempts,
-
       });
-
 
       /*
        * ---------------------------------------------------
@@ -462,80 +377,49 @@ export default function AssessmentOverviewPage() {
           },
         );
 
-
-      if (
-        securityResponse.ok
-      ) {
-
+      if (securityResponse.ok) {
         const securityData =
           await securityResponse.json();
 
-
         setSecurity(
           securityData.security ??
-          null,
+            null,
         );
-
       }
-
-
-    }
-    catch (error: any) {
-
+    } catch (error: any) {
       console.error(
         "OVERVIEW ERROR",
         error,
       );
 
-
       setError(
         error?.message ||
-        "Unable to load assessment",
+          "Unable to load assessment",
       );
-
-    }
-    finally {
-
+    } finally {
       setLoading(false);
-
     }
-
   }
-
 
   /*
    * =====================================================
    * START ASSESSMENT
-   *
-   * IMPORTANT:
-   *
-   * We DO NOT directly navigate to environment.
-   *
-   * First create/resume an attempt through backend.
-   *
-   * The backend is responsible for enforcing
-   * the maximum attempt limit.
    * =====================================================
    */
 
   async function startAssessment() {
-
     if (!agree) {
       return;
     }
-
 
     if (!assessment) {
       return;
     }
 
-
     try {
-
       setStarting(true);
 
       setError("");
-
 
       /*
        * ---------------------------------------------------
@@ -554,45 +438,23 @@ export default function AssessmentOverviewPage() {
                 "application/json",
             },
 
-            body:
-              JSON.stringify({
+            body: JSON.stringify({
+              assessmentId:
+                assessment.id,
 
-                assessmentId:
-                  assessment.id,
+              learnerId:
+                "LEARNER001",
 
-                /*
-                 * Current learner login is
-                 * still using the dummy learner.
-                 *
-                 * The backend can use this value
-                 * until real authentication is connected.
-                 */
+              attemptsAllowed:
+                maxAttempts ??
+                assessment.attemptsAllowed,
 
-                learnerId:
-                  "LEARNER001",
-
-                /*
-                 * Attempts Allowed is stored in the scoring
-                 * configuration. Send the resolved value
-                 * as a compatibility fallback for backends
-                 * that still read it from the start payload.
-                 *
-                 * The backend MUST still validate the
-                 * authoritative scoring configuration.
-                 */
-
-                attemptsAllowed:
-                  maxAttempts ??
-                  assessment.attemptsAllowed,
-
-                maximumAttempts:
-                  maxAttempts ??
-                  assessment.attemptsAllowed,
-
-              }),
+              maximumAttempts:
+                maxAttempts ??
+                assessment.attemptsAllowed,
+            }),
           },
         );
-
 
       /*
        * ---------------------------------------------------
@@ -601,41 +463,21 @@ export default function AssessmentOverviewPage() {
        */
 
       if (!response.ok) {
-
         let errorData:
-          StartAttemptResponse | null =
-          null;
-
+          | StartAttemptResponse
+          | null = null;
 
         try {
-
           errorData =
             await response.json();
-
-        }
-        catch {
-
+        } catch {
           errorData = null;
-
         }
-
 
         const backendMessage =
           errorData?.message ||
           errorData?.error ||
           `Unable to start assessment. HTTP ${response.status}`;
-
-        /*
-         * ---------------------------------------------------
-         * ATTEMPT LIMIT IS A NORMAL LEARNER STATE
-         * ---------------------------------------------------
-         *
-         * Do NOT throw this message.
-         * Do NOT console.error() it.
-         *
-         * The learner should simply see one message on
-         * the overview page and remain on this page.
-         */
 
         const normalizedBackendMessage =
           backendMessage.toLowerCase();
@@ -657,53 +499,34 @@ export default function AssessmentOverviewPage() {
             "all allowed attempts",
           );
 
-        /*
-         * If backend returns attempt information,
-         * keep the UI state synchronized.
-         */
-
         if (
           typeof errorData?.attemptsUsed ===
           "number"
         ) {
-
           setAttemptsUsed(
             errorData.attemptsUsed,
           );
-
         }
-
 
         if (
           typeof errorData?.attemptsRemaining ===
           "number"
         ) {
-
           setAttemptsRemaining(
             errorData.attemptsRemaining,
           );
-
         }
-
 
         if (
           typeof errorData?.maxAttempts ===
           "number"
         ) {
-
           setMaxAttempts(
             errorData.maxAttempts,
           );
-
         }
 
-
         if (attemptLimitReached) {
-
-          /*
-           * Show only the backend message in the UI.
-           * No exception is thrown.
-           */
           setError(backendMessage);
 
           setAgree(false);
@@ -711,23 +534,13 @@ export default function AssessmentOverviewPage() {
           return;
         }
 
-
-        /*
-         * Other start-attempt errors are also shown in
-         * the UI instead of being thrown to the browser
-         * console.
-         */
         setError(backendMessage);
 
         return;
-
       }
 
-
-      const data:
-        StartAttemptResponse =
+      const data: StartAttemptResponse =
         await response.json();
-
 
       /*
        * ---------------------------------------------------
@@ -739,53 +552,32 @@ export default function AssessmentOverviewPage() {
         typeof data.attemptsUsed ===
         "number"
       ) {
-
         setAttemptsUsed(
           data.attemptsUsed,
         );
-
       }
-
 
       if (
         typeof data.attemptsRemaining ===
         "number"
       ) {
-
         setAttemptsRemaining(
           data.attemptsRemaining,
         );
-
       }
-
 
       if (
         typeof data.maxAttempts ===
         "number"
       ) {
-
         setMaxAttempts(
           data.maxAttempts,
         );
-
       }
-
 
       /*
        * ---------------------------------------------------
        * GET ATTEMPT ID
-       *
-       * Your service may return:
-       *
-       * {
-       *   id: "..."
-       * }
-       *
-       * or:
-       *
-       * {
-       *   attemptId: "..."
-       * }
        * ---------------------------------------------------
        */
 
@@ -793,21 +585,15 @@ export default function AssessmentOverviewPage() {
         data.attemptId ||
         data.id;
 
-
       if (!attemptId) {
-
         throw new Error(
           "Assessment started but no attempt ID was returned by the server.",
         );
-
       }
-
 
       /*
        * ---------------------------------------------------
        * NAVIGATE TO ENVIRONMENT
-       *
-       * Attempt ID is passed to environment.
        * ---------------------------------------------------
        */
 
@@ -818,31 +604,16 @@ export default function AssessmentOverviewPage() {
           attemptId,
         )}`,
       );
-
-
-    }
-    catch (error: any) {
-
-      /*
-       * Start-attempt failures are learner-facing states.
-       * Do not print expected backend responses such as
-       * "Attempt limit reached" as Console Errors.
-       */
+    } catch (error: any) {
       const message =
         error?.message ||
         "Unable to start assessment.";
 
       setError(message);
-
-    }
-    finally {
-
+    } finally {
       setStarting(false);
-
     }
-
   }
-
 
   /*
    * =====================================================
@@ -851,9 +622,7 @@ export default function AssessmentOverviewPage() {
    */
 
   if (loading) {
-
     return (
-
       <div
         className="
           min-h-screen
@@ -865,15 +634,10 @@ export default function AssessmentOverviewPage() {
           text-[#25324b]
         "
       >
-
         Loading assessment...
-
       </div>
-
     );
-
   }
-
 
   /*
    * =====================================================
@@ -881,13 +645,8 @@ export default function AssessmentOverviewPage() {
    * =====================================================
    */
 
-  if (
-    error &&
-    !assessment
-  ) {
-
+  if (error && !assessment) {
     return (
-
       <div
         className="
           min-h-screen
@@ -897,7 +656,6 @@ export default function AssessmentOverviewPage() {
           justify-center
         "
       >
-
         <div
           className="
             rounded-3xl
@@ -906,18 +664,14 @@ export default function AssessmentOverviewPage() {
             shadow-[8px_8px_16px_#c7ccd3,-8px_-8px_16px_#ffffff]
           "
         >
-
           <h1
             className="
               text-xl
               font-bold
             "
           >
-
             Assessment unavailable
-
           </h1>
-
 
           <p
             className="
@@ -925,24 +679,15 @@ export default function AssessmentOverviewPage() {
               text-gray-500
             "
           >
-
             {error}
-
           </p>
-
         </div>
-
       </div>
-
     );
-
   }
 
-
   if (!assessment) {
-
     return (
-
       <div
         className="
           min-h-screen
@@ -952,7 +697,6 @@ export default function AssessmentOverviewPage() {
           justify-center
         "
       >
-
         <div
           className="
             rounded-3xl
@@ -961,17 +705,11 @@ export default function AssessmentOverviewPage() {
             shadow-[8px_8px_16px_#c7ccd3,-8px_-8px_16px_#ffffff]
           "
         >
-
           Assessment unavailable
-
         </div>
-
       </div>
-
     );
-
   }
-
 
   /*
    * =====================================================
@@ -983,14 +721,12 @@ export default function AssessmentOverviewPage() {
     maxAttempts ??
     assessment.attemptsAllowed;
 
-
   const attemptsExhausted =
     limit !== null &&
     limit !== undefined &&
     limit > 0 &&
     attemptsRemaining !== null &&
     attemptsRemaining <= 0;
-
 
   /*
    * =====================================================
@@ -999,7 +735,6 @@ export default function AssessmentOverviewPage() {
    */
 
   return (
-
     <div
       className="
         min-h-screen
@@ -1008,19 +743,12 @@ export default function AssessmentOverviewPage() {
         text-[#25324b]
       "
     >
-
       <div
         className="
           max-w-7xl
           mx-auto
         "
       >
-
-
-        {/* =================================================
-            HEADER
-        ================================================== */}
-
         <div
           className="
             rounded-3xl
@@ -1030,18 +758,14 @@ export default function AssessmentOverviewPage() {
             shadow-[9px_9px_18px_#c7ccd3,-9px_-9px_18px_#ffffff]
           "
         >
-
           <h1
             className="
               text-3xl
               font-bold
             "
           >
-
             {assessment.title}
-
           </h1>
-
 
           <p
             className="
@@ -1049,17 +773,9 @@ export default function AssessmentOverviewPage() {
               text-gray-500
             "
           >
-
             {assessment.code}
-
           </p>
-
         </div>
-
-
-        {/* =================================================
-            SUMMARY
-        ================================================== */}
 
         <div
           className="
@@ -1070,7 +786,6 @@ export default function AssessmentOverviewPage() {
             mb-8
           "
         >
-
           <InfoCard
             title="Technology"
             value={
@@ -1078,7 +793,6 @@ export default function AssessmentOverviewPage() {
               "-"
             }
           />
-
 
           <InfoCard
             title="Difficulty"
@@ -1088,40 +802,25 @@ export default function AssessmentOverviewPage() {
             }
           />
 
-
           <InfoCard
             title="Questions"
-            value={
-              String(
-                assessment.plannedQuestions,
-              )
-            }
+            value={String(
+              assessment.plannedQuestions,
+            )}
           />
-
 
           <InfoCard
             title="Marks"
-            value={
-              String(
-                assessment.totalMarks,
-              )
-            }
+            value={String(
+              assessment.totalMarks,
+            )}
           />
-
 
           <InfoCard
             title="Duration"
-            value={
-              `${assessment.durationMinutes} Minutes`
-            }
+            value={`${assessment.durationMinutes} Minutes`}
           />
-
         </div>
-
-
-        {/* =================================================
-            MAIN CONTENT
-        ================================================== */}
 
         <div
           className="
@@ -1130,22 +829,12 @@ export default function AssessmentOverviewPage() {
             gap-6
           "
         >
-
-
-          {/* =================================================
-              LEFT
-          ================================================== */}
-
           <div
             className="
               lg:col-span-2
               space-y-6
             "
           >
-
-
-            {/* ASSESSMENT OVERVIEW */}
-
             <section
               className="
                 rounded-3xl
@@ -1154,7 +843,6 @@ export default function AssessmentOverviewPage() {
                 shadow-[8px_8px_16px_#c7ccd3,-8px_-8px_16px_#ffffff]
               "
             >
-
               <h2
                 className="
                   text-xl
@@ -1162,11 +850,8 @@ export default function AssessmentOverviewPage() {
                   mb-4
                 "
               >
-
                 Assessment Overview
-
               </h2>
-
 
               <p
                 className="
@@ -1174,19 +859,11 @@ export default function AssessmentOverviewPage() {
                   leading-7
                 "
               >
-
-                {
-                  assessment.description
-                    ? assessment.description
-                    : "No description provided."
-                }
-
+                {assessment.description
+                  ? assessment.description
+                  : "No description provided."}
               </p>
-
             </section>
-
-
-            {/* FLOW */}
 
             <section
               className="
@@ -1196,7 +873,6 @@ export default function AssessmentOverviewPage() {
                 shadow-[8px_8px_16px_#c7ccd3,-8px_-8px_16px_#ffffff]
               "
             >
-
               <h2
                 className="
                   text-xl
@@ -1204,18 +880,14 @@ export default function AssessmentOverviewPage() {
                   mb-5
                 "
               >
-
                 Assessment Flow
-
               </h2>
-
 
               <div
                 className="
                   space-y-3
                 "
               >
-
                 <TocItem
                   number="01"
                   text="Read assessment instructions"
@@ -1245,13 +917,8 @@ export default function AssessmentOverviewPage() {
                   number="06"
                   text="View assessment result"
                 />
-
               </div>
-
             </section>
-
-
-            {/* INSTRUCTIONS */}
 
             <section
               className="
@@ -1261,7 +928,6 @@ export default function AssessmentOverviewPage() {
                 shadow-[8px_8px_16px_#c7ccd3,-8px_-8px_16px_#ffffff]
               "
             >
-
               <h2
                 className="
                   text-xl
@@ -1269,59 +935,32 @@ export default function AssessmentOverviewPage() {
                   mb-4
                 "
               >
-
                 Instructions
-
               </h2>
 
-
-              {
-                assessment.instructions
-
-                  ? (
-
-                    <p
-                      className="
-                        whitespace-pre-line
-                        text-gray-600
-                        leading-7
-                      "
-                    >
-
-                      {
-                        assessment.instructions
-                      }
-
-                    </p>
-
-                  )
-
-                  : (
-
-                    <p
-                      className="
-                        text-gray-500
-                      "
-                    >
-
-                      No instructions provided.
-
-                    </p>
-
-                  )
-              }
-
+              {assessment.instructions ? (
+                <p
+                  className="
+                    whitespace-pre-line
+                    text-gray-600
+                    leading-7
+                  "
+                >
+                  {assessment.instructions}
+                </p>
+              ) : (
+                <p
+                  className="
+                    text-gray-500
+                  "
+                >
+                  No instructions provided.
+                </p>
+              )}
             </section>
-
           </div>
 
-
-          {/* =================================================
-              RIGHT
-          ================================================== */}
-
           <div>
-
             <div
               className="
                 sticky
@@ -1332,10 +971,6 @@ export default function AssessmentOverviewPage() {
                 shadow-[9px_9px_18px_#c7ccd3,-9px_-9px_18px_#ffffff]
               "
             >
-
-
-              {/* RULES */}
-
               <h2
                 className="
                   text-xl
@@ -1343,11 +978,8 @@ export default function AssessmentOverviewPage() {
                   mb-5
                 "
               >
-
                 Assessment Rules
-
               </h2>
-
 
               <ul
                 className="
@@ -1355,78 +987,42 @@ export default function AssessmentOverviewPage() {
                   text-gray-600
                 "
               >
+                {security?.fullscreenMode && (
+                  <li>
+                    ✓ Fullscreen mode enabled
+                  </li>
+                )}
 
-                {
-                  security?.fullscreenMode && (
+                {security?.tabSwitchDetection && (
+                  <li>
+                    ✓ Tab switching detection enabled
+                  </li>
+                )}
 
-                    <li>
-                      ✓ Fullscreen mode enabled
-                    </li>
+                {security?.copyPasteDetection && (
+                  <li>
+                    ✓ Copy paste monitoring enabled
+                  </li>
+                )}
 
-                  )
-                }
+                {security?.cameraProctoring && (
+                  <li>
+                    ✓ Camera proctoring enabled
+                  </li>
+                )}
 
+                {security?.microphoneMonitoring && (
+                  <li>
+                    ✓ Microphone monitoring enabled
+                  </li>
+                )}
 
-                {
-                  security?.tabSwitchDetection && (
-
-                    <li>
-                      ✓ Tab switching detection enabled
-                    </li>
-
-                  )
-                }
-
-
-                {
-                  security?.copyPasteDetection && (
-
-                    <li>
-                      ✓ Copy paste monitoring enabled
-                    </li>
-
-                  )
-                }
-
-
-                {
-                  security?.cameraProctoring && (
-
-                    <li>
-                      ✓ Camera proctoring enabled
-                    </li>
-
-                  )
-                }
-
-
-                {
-                  security?.microphoneMonitoring && (
-
-                    <li>
-                      ✓ Microphone monitoring enabled
-                    </li>
-
-                  )
-                }
-
-
-                {
-                  !security && (
-
-                    <li>
-                      ✓ Complete assessment within time
-                    </li>
-
-                  )
-                }
-
+                {!security && (
+                  <li>
+                    ✓ Complete assessment within time
+                  </li>
+                )}
               </ul>
-
-
-              {/* =================================================
-                  ATTEMPT INFORMATION
-              ================================================== */}
 
               <div
                 className="
@@ -1437,17 +1033,13 @@ export default function AssessmentOverviewPage() {
                   shadow-inner
                 "
               >
-
                 <h3
                   className="
                     font-bold
                   "
                 >
-
                   Attempt Limit
-
                 </h3>
-
 
                 <div
                   className="
@@ -1456,7 +1048,6 @@ export default function AssessmentOverviewPage() {
                     text-sm
                   "
                 >
-
                   <div
                     className="
                       flex
@@ -1464,115 +1055,79 @@ export default function AssessmentOverviewPage() {
                       gap-4
                     "
                   >
-
                     <span>
                       Attempts Allowed
                     </span>
 
                     <strong>
-                      {
-                        limit &&
-                        limit > 0
-                          ? limit
-                          : "-"
-                      }
+                      {limit &&
+                      limit > 0
+                        ? limit
+                        : "-"}
                     </strong>
-
                   </div>
 
-
-                  {
-                    attemptsUsed !== null && (
-
-                      <div
-                        className="
-                          flex
-                          justify-between
-                          gap-4
-                        "
-                      >
-
-                        <span>
-                          Attempts Used
-                        </span>
-
-                        <strong>
-                          {
-                            attemptsUsed
-                          }
-                        </strong>
-
-                      </div>
-
-                    )
-                  }
-
-
-                  {
-                    attemptsRemaining !== null && (
-
-                      <div
-                        className="
-                          flex
-                          justify-between
-                          gap-4
-                        "
-                      >
-
-                        <span>
-                          Attempts Remaining
-                        </span>
-
-                        <strong
-                          className={
-                            attemptsRemaining <= 0
-                              ? "text-red-600"
-                              : "text-[#24579a]"
-                          }
-                        >
-                          {
-                            attemptsRemaining
-                          }
-                        </strong>
-
-                      </div>
-
-                    )
-                  }
-
-                </div>
-
-
-                {
-                  attemptsExhausted && (
-
-                    <p
+                  {attemptsUsed !== null && (
+                    <div
                       className="
-                        mt-4
-                        rounded-xl
-                        bg-red-100
-                        p-3
-                        text-sm
-                        font-semibold
-                        text-red-700
+                        flex
+                        justify-between
+                        gap-4
                       "
                     >
+                      <span>
+                        Attempts Used
+                      </span>
 
-                      You have reached the maximum
-                      number of attempts allowed for
-                      this assessment.
+                      <strong>
+                        {attemptsUsed}
+                      </strong>
+                    </div>
+                  )}
 
-                    </p>
+                  {attemptsRemaining !== null && (
+                    <div
+                      className="
+                        flex
+                        justify-between
+                        gap-4
+                      "
+                    >
+                      <span>
+                        Attempts Remaining
+                      </span>
 
-                  )
-                }
+                      <strong
+                        className={
+                          attemptsRemaining <= 0
+                            ? "text-red-600"
+                            : "text-[#24579a]"
+                        }
+                      >
+                        {attemptsRemaining}
+                      </strong>
+                    </div>
+                  )}
+                </div>
 
+                {attemptsExhausted && (
+                  <p
+                    className="
+                      mt-4
+                      rounded-xl
+                      bg-red-100
+                      p-3
+                      text-sm
+                      font-semibold
+                      text-red-700
+                    "
+                  >
+                    You have reached the maximum
+                    number of attempts allowed for
+                    this assessment.
+                  </p>
+                )}
               </div>
-
-
-              {/* =================================================
-                  AGREEMENT
-              ================================================== */}
 
               <div
                 className="
@@ -1581,7 +1136,6 @@ export default function AssessmentOverviewPage() {
                   gap-3
                 "
               >
-
                 <input
                   type="checkbox"
                   checked={agree}
@@ -1601,53 +1155,33 @@ export default function AssessmentOverviewPage() {
                   "
                 />
 
-
                 <label
                   className="
                     text-sm
                     text-gray-600
                   "
                 >
-
                   I have read and agree to the
                   assessment instructions and
                   rules.
-
                 </label>
-
               </div>
 
-
-              {/* =================================================
-                  ERROR
-              ================================================== */}
-
-              {
-                error && (
-
-                  <div
-                    className="
-                      mt-5
-                      rounded-xl
-                      bg-red-100
-                      p-4
-                      text-sm
-                      font-semibold
-                      text-red-700
-                    "
-                  >
-
-                    {error}
-
-                  </div>
-
-                )
-              }
-
-
-              {/* =================================================
-                  BACK TO ASSESSMENTS
-              ================================================== */}
+              {error && (
+                <div
+                  className="
+                    mt-5
+                    rounded-xl
+                    bg-red-100
+                    p-4
+                    text-sm
+                    font-semibold
+                    text-red-700
+                  "
+                >
+                  {error}
+                </div>
+              )}
 
               <button
                 type="button"
@@ -1675,11 +1209,6 @@ export default function AssessmentOverviewPage() {
                 BACK
               </button>
 
-
-              {/* =================================================
-                  START BUTTON
-              ================================================== */}
-
               <button
                 disabled={
                   !agree ||
@@ -1702,34 +1231,21 @@ export default function AssessmentOverviewPage() {
                     agree &&
                     !starting &&
                     !attemptsExhausted
-
                       ? "bg-[#24579a] hover:bg-[#1d477d]"
-
                       : "bg-gray-400 cursor-not-allowed"
                   }
                 `}
               >
-
-                {
-                  starting
-
-                    ? "STARTING TEST..."
-
-                    : attemptsExhausted
-
-                      ? "ATTEMPTS EXHAUSTED"
-
-                      : "START TEST"
-                }
-
+                {starting
+                  ? "STARTING TEST..."
+                  : attemptsExhausted
+                    ? "ATTEMPTS EXHAUSTED"
+                    : "START TEST"}
               </button>
 
-
-              {
-                !attemptsExhausted &&
+              {!attemptsExhausted &&
                 limit &&
                 limit > 0 && (
-
                   <p
                     className="
                       mt-3
@@ -1738,7 +1254,6 @@ export default function AssessmentOverviewPage() {
                       text-gray-500
                     "
                   >
-
                     Maximum{" "}
                     <strong>
                       {limit}
@@ -1748,25 +1263,15 @@ export default function AssessmentOverviewPage() {
                       ? ""
                       : "s"}{" "}
                     allowed.
-
                   </p>
-
-                )
-              }
-
+                )}
             </div>
-
           </div>
-
         </div>
-
       </div>
-
     </div>
-
   );
 }
-
 
 /*
 =========================================================
@@ -1774,18 +1279,14 @@ INFO CARD
 =========================================================
 */
 
-function InfoCard(
-  {
-    title,
-    value,
-  }: {
-    title: string;
-    value: string;
-  },
-) {
-
+function InfoCard({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
   return (
-
     <div
       className="
         rounded-2xl
@@ -1794,7 +1295,6 @@ function InfoCard(
         shadow-[6px_6px_12px_#c7ccd3,-6px_-6px_12px_#ffffff]
       "
     >
-
       <p
         className="
           text-xs
@@ -1802,11 +1302,8 @@ function InfoCard(
           text-gray-500
         "
       >
-
         {title}
-
       </p>
-
 
       <p
         className="
@@ -1814,17 +1311,11 @@ function InfoCard(
           font-bold
         "
       >
-
         {value}
-
       </p>
-
     </div>
-
   );
-
 }
-
 
 /*
 =========================================================
@@ -1832,18 +1323,14 @@ TOC ITEM
 =========================================================
 */
 
-function TocItem(
-  {
-    number,
-    text,
-  }: {
-    number: string;
-    text: string;
-  },
-) {
-
+function TocItem({
+  number,
+  text,
+}: {
+  number: string;
+  text: string;
+}) {
   return (
-
     <div
       className="
         flex
@@ -1854,31 +1341,22 @@ function TocItem(
         shadow-inner
       "
     >
-
       <div
         className="
           font-bold
           text-blue-700
         "
       >
-
         {number}
-
       </div>
-
 
       <div
         className="
           text-gray-700
         "
       >
-
         {text}
-
       </div>
-
     </div>
-
   );
-
 }
