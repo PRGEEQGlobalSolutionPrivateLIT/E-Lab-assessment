@@ -11,8 +11,7 @@ import {
   useSearchParams,
 } from "next/navigation";
 
-import { API_URL } from "@/src/lib/api/fetcher";
-
+import { API_URL } from "@/lib/api/fetcher";
 type Assessment = {
   id: string;
 
