@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-
 import "./create-assessment.css";
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:3001";
+
+import { API_URL } from "@/src/lib/api/fetcher";
+
+/* ============================================================
+   TYPES
+   ============================================================ */
 
 type AssessmentType =
   | "CODING_ASSESSMENT"
@@ -51,6 +53,16 @@ interface AssessmentForm {
   tags: string;
 }
 
+interface CreatedAssessment {
+  id: string;
+  title?: string;
+  code?: string;
+}
+
+/* ============================================================
+   INITIAL FORM
+   ============================================================ */
+
 const INITIAL_FORM: AssessmentForm = {
   title: "",
   code: "",
@@ -73,6 +85,10 @@ const INITIAL_FORM: AssessmentForm = {
   tags: "",
 };
 
+/* ============================================================
+   PAGE
+   ============================================================ */
+
 export default function CreateAssessmentPage() {
   const router = useRouter();
 
@@ -84,8 +100,12 @@ export default function CreateAssessmentPage() {
   const [errors, setErrors] =
     useState<string[]>([]);
 
-  // const [saved, setSaved] =
-  //   useState(false);
+  const [saving, setSaving] =
+    useState(false);
+
+  /* ============================================================
+     UPDATE FIELD
+     ============================================================ */
 
   function updateField<
     K extends keyof AssessmentForm,
@@ -98,292 +118,335 @@ export default function CreateAssessmentPage() {
       [field]: value,
     }));
 
-    // setSaved(false);
+    setErrors([]);
   }
+
+  /* ============================================================
+     VALIDATION
+     ============================================================ */
 
   function validateForm() {
+    const validationErrors: string[] =
+      [];
 
-  const validationErrors:string[] = [];
+    if (!form.title.trim()) {
+      validationErrors.push(
+        "Assessment title is required.",
+      );
+    }
 
+    if (
+      form.title.trim() &&
+      form.title.trim().length < 5
+    ) {
+      validationErrors.push(
+        "Assessment title must contain minimum 5 characters.",
+      );
+    }
 
-  if (!form.title.trim()) {
+    if (!form.code.trim()) {
+      validationErrors.push(
+        "Assessment code is required.",
+      );
+    }
 
-    validationErrors.push(
-      "Assessment title is required."
+    if (
+      form.code.trim() &&
+      !/^[A-Z0-9_-]+$/i.test(
+        form.code.trim(),
+      )
+    ) {
+      validationErrors.push(
+        "Assessment code can contain only letters, numbers, hyphens and underscores.",
+      );
+    }
+
+    if (!form.technology.trim()) {
+      validationErrors.push(
+        "Technology selection is required.",
+      );
+    }
+
+    if (!form.description.trim()) {
+      validationErrors.push(
+        "Assessment description is required.",
+      );
+    }
+
+    if (!form.instructions.trim()) {
+      validationErrors.push(
+        "Learner instructions are required.",
+      );
+    }
+
+    if (
+      form.plannedQuestions <= 0
+    ) {
+      validationErrors.push(
+        "Planned questions must be greater than zero.",
+      );
+    }
+
+    if (
+      form.totalMarks <= 0
+    ) {
+      validationErrors.push(
+        "Total marks must be greater than zero.",
+      );
+    }
+
+    if (
+      form.durationMinutes <= 0
+    ) {
+      validationErrors.push(
+        "Duration must be greater than zero.",
+      );
+    }
+
+    setErrors(
+      validationErrors,
     );
 
-  }
-
-
-  if (
-    form.title.trim() &&
-    form.title.trim().length < 5
-  ) {
-
-    validationErrors.push(
-      "Assessment title must contain minimum 5 characters."
+    return (
+      validationErrors.length ===
+      0
     );
-
   }
 
+  /* ============================================================
+     CREATE ASSESSMENT
+     ============================================================ */
 
-  if (!form.code.trim()) {
+  async function createAssessment() {
+    /*
+     * Keep backend payload compatible
+     * with the existing Assessment API.
+     */
 
-    validationErrors.push(
-      "Assessment code is required."
-    );
+    const payload = {
+      organizationId:
+        "ORG001",
 
-  }
+      title:
+        form.title.trim(),
 
+      code:
+        form.code.trim(),
 
-  if (!form.technology.trim()) {
+      assessmentType:
+        form.type,
 
-    validationErrors.push(
-      "Technology selection is required."
-    );
+      description:
+        form.description.trim(),
 
-  }
+      instructions:
+        form.instructions.trim(),
 
+      technology:
+        form.technology,
 
-  if (!form.description.trim()) {
+      difficulty:
+        form.difficulty,
 
-    validationErrors.push(
-      "Assessment description is required."
-    );
+      plannedQuestions:
+        Number(
+          form.plannedQuestions,
+        ),
 
-  }
+      totalMarks:
+        Number(
+          form.totalMarks,
+        ),
 
+      durationMinutes:
+        Number(
+          form.durationMinutes,
+        ),
 
-  if (!form.instructions.trim()) {
+      createdByUserId:
+        "ADMIN001",
+    };
 
-    validationErrors.push(
-      "Learner instructions are required."
-    );
+    try {
+      setSaving(true);
 
-  }
-
-
-  if (form.plannedQuestions <= 0) {
-
-    validationErrors.push(
-      "Planned questions must be greater than zero."
-    );
-
-  }
-
-
-  if (form.totalMarks <= 0) {
-
-    validationErrors.push(
-      "Total marks must be greater than zero."
-    );
-
-  }
-
-
-  if (form.durationMinutes <= 0) {
-
-    validationErrors.push(
-      "Duration must be greater than zero."
-    );
-
-  }
-
-
-  setErrors(validationErrors);
-
-
-  return validationErrors.length === 0;
-
-}
-
-  // function saveDraft() {
-  //   if (!validateForm()) {
-  //     return;
-  //   }
-
-  //   const draft = {
-  //     ...form,
-
-  //     status: "DRAFT",
-
-  //     updatedAt:
-  //       new Date().toISOString(),
-  //   };
-
-  //   sessionStorage.setItem(
-  //     "assessmentDraft",
-  //     JSON.stringify(draft),
-  //   );
-
-  //   setSaved(true);
-
-  //   console.log(
-  //     "Assessment draft:",
-  //     draft,
-  //   );
-  // }
-
-  async function saveAndContinue() {
-
-
-  if (!validateForm()) {
-
-    return;
-
-  }
-
-
-
-  try {
-
-
-    const response =
-      await fetch(
-        `${API_URL}/assessment`,
-        {
-
-          method:"POST",
-
-
-          headers:{
-
-            "Content-Type":
-              "application/json",
-
-          },
-
-
-          body:JSON.stringify({
-
-            organizationId:
-              "ORG001",
-
-
-            title:
-              form.title.trim(),
-
-
-            code:
-              form.code.trim(),
-
-
-            assessmentType:
-              form.type,
-
-
-            description:
-              form.description.trim(),
-
-
-            instructions:
-              form.instructions.trim(),
-
-
-            technology:
-              form.technology,
-
-
-            difficulty:
-              form.difficulty,
-
-
-            plannedQuestions:
-              form.plannedQuestions,
-
-
-            totalMarks:
-              form.totalMarks,
-
-
-            durationMinutes:
-              form.durationMinutes,
-
-
-            createdByUserId:
-              "ADMIN001",
-
-          })
-
-        }
-
+      console.log(
+        "CREATE ASSESSMENT REQUEST:",
+        payload,
       );
 
+      const response =
+        await fetch(
+          `${API_URL}/assessment`,
+          {
+            method: "POST",
 
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
 
+            body:
+              JSON.stringify(
+                payload,
+              ),
+          },
+        );
 
-   if(!response.ok){
+      if (!response.ok) {
+        const responseText =
+          await response.text();
 
-  const errorText =
-    await response.text();
+        let errorMessage =
+          "Unable to save assessment.";
 
-  console.log(
-    "BACKEND RESPONSE ERROR:",
-    errorText
-  );
+        /*
+         * Supports NestJS-style responses:
+         *
+         * {
+         *   message: "..."
+         * }
+         *
+         * OR
+         *
+         * {
+         *   message: ["...", "..."]
+         * }
+         */
 
-  throw new Error(
-    errorText
-  );
+        try {
+          const errorData =
+            responseText
+              ? JSON.parse(
+                  responseText,
+                )
+              : null;
 
-}
+          if (
+            Array.isArray(
+              errorData?.message,
+            )
+          ) {
+            errorMessage =
+              errorData.message.join(
+                "; ",
+              );
+          } else if (
+            errorData?.message
+          ) {
+            errorMessage =
+              String(
+                errorData.message,
+              );
+          } else if (
+            responseText.trim()
+          ) {
+            errorMessage =
+              responseText;
+          }
+        } catch {
+          if (
+            responseText.trim()
+          ) {
+            errorMessage =
+              responseText;
+          }
+        }
 
+        throw new Error(
+          errorMessage,
+        );
+      }
 
+      const assessment =
+        (await response.json()) as CreatedAssessment;
 
-    const assessment =
-      await response.json();
+      console.log(
+        "Created Assessment:",
+        assessment,
+      );
 
+      if (!assessment?.id) {
+        throw new Error(
+          "Assessment was created, but the backend did not return an assessment ID.",
+        );
+      }
 
+      /*
+       * Keep the current assessment ID
+       * available for the authoring flow.
+       */
 
-    console.log(
-      "Created Assessment:",
-      assessment
-    );
+      sessionStorage.setItem(
+        "currentAssessmentId",
+        assessment.id,
+      );
 
+      /*
+       * Continue to Step 2.
+       */
 
+      router.push(
+        `/assessments/${assessment.id}/structure`,
+      );
+    } catch (error) {
+      console.error(
+        "CREATE ASSESSMENT ERROR:",
+        error,
+      );
 
-    sessionStorage.setItem(
+      setErrors([
+        error instanceof Error
+          ? error.message
+          : "Unable to save assessment. Please try again.",
+      ]);
+    } finally {
+      setSaving(false);
+    }
+  }
 
-      "currentAssessmentId",
+  /* ============================================================
+     SAVE & CONTINUE
+     ============================================================ */
 
-      assessment.id
+  async function saveAndContinue() {
+    if (saving) {
+      return;
+    }
 
-    );
+    if (!validateForm()) {
+      return;
+    }
 
+    await createAssessment();
+  }
 
+  /* ============================================================
+     CANCEL
+     ============================================================ */
+
+  function cancelAssessment() {
+    if (saving) {
+      return;
+    }
 
     router.push(
-
-      `/assessments/${assessment.id}/questions`
-
+      "/assessments",
     );
-
-
   }
 
-  catch(error){
+  /* ============================================================
+     UI
+     ============================================================ */
 
-
-    console.error(
-      error
-    );
-
-
-    setErrors([
-
-      "Unable to save assessment. Please try again."
-
-    ]);
-
-
-  }
-
-
-}
   return (
     <main className="create-assessment-page">
 
       <div className="create-assessment-container">
+
+        {/* ====================================================
+            HEADER
+        ==================================================== */}
 
         <header className="create-assessment-header">
 
@@ -392,6 +455,7 @@ export default function CreateAssessmentPage() {
             <button
               type="button"
               className="back-link"
+              disabled={saving}
               onClick={() =>
                 router.push(
                   "/assessments",
@@ -420,7 +484,15 @@ export default function CreateAssessmentPage() {
 
         </header>
 
+        {/* ====================================================
+            AUTHORING LAYOUT
+        ==================================================== */}
+
         <div className="assessment-authoring-layout">
+
+          {/* ==================================================
+              STEPPER
+          ================================================== */}
 
           <aside className="assessment-stepper">
 
@@ -477,6 +549,10 @@ export default function CreateAssessmentPage() {
 
           </aside>
 
+          {/* ==================================================
+              FORM
+          ================================================== */}
+
           <section className="assessment-form-card">
 
             <div className="section-header">
@@ -500,13 +576,11 @@ export default function CreateAssessmentPage() {
 
               </div>
 
-              {/* {saved && (
-                <span className="saved-message">
-                  Saved
-                </span>
-              )} */}
-
             </div>
+
+            {/* =================================================
+                ERRORS
+            ================================================= */}
 
             {errors.length > 0 && (
               <div className="error-box">
@@ -518,8 +592,13 @@ export default function CreateAssessmentPage() {
                 <ul>
 
                   {errors.map(
-                    (error) => (
-                      <li key={error}>
+                    (
+                      error,
+                      index,
+                    ) => (
+                      <li
+                        key={`${error}-${index}`}
+                      >
                         {error}
                       </li>
                     ),
@@ -529,6 +608,10 @@ export default function CreateAssessmentPage() {
 
               </div>
             )}
+
+            {/* =================================================
+                BASIC INFORMATION
+            ================================================= */}
 
             <section className="form-section">
 
@@ -542,6 +625,7 @@ export default function CreateAssessmentPage() {
 
                   <label htmlFor="title">
                     Assessment Title
+
                     <span className="required">
                       *
                     </span>
@@ -553,10 +637,12 @@ export default function CreateAssessmentPage() {
                     maxLength={180}
                     placeholder="Example: C Programming Fundamentals - Level 1"
                     value={form.title}
+                    disabled={saving}
                     onChange={(event) =>
                       updateField(
                         "title",
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                   />
@@ -586,6 +672,7 @@ export default function CreateAssessmentPage() {
 
                   <label htmlFor="code">
                     Assessment Code
+
                     <span className="required">
                       *
                     </span>
@@ -594,8 +681,10 @@ export default function CreateAssessmentPage() {
                   <input
                     id="code"
                     type="text"
+                    maxLength={100}
                     placeholder="C-FUND-L1-001"
                     value={form.code}
+                    disabled={saving}
                     onChange={(event) =>
                       updateField(
                         "code",
@@ -616,7 +705,10 @@ export default function CreateAssessmentPage() {
                   <input
                     id="version"
                     type="text"
-                    value={form.version}
+                    value={
+                      form.version
+                    }
+                    disabled={saving}
                     onChange={(event) =>
                       updateField(
                         "version",
@@ -630,6 +722,10 @@ export default function CreateAssessmentPage() {
               </div>
 
             </section>
+
+            {/* =================================================
+                PURPOSE & CLASSIFICATION
+            ================================================= */}
 
             <section className="form-section">
 
@@ -648,7 +744,10 @@ export default function CreateAssessmentPage() {
 
                   <select
                     id="type"
-                    value={form.type}
+                    value={
+                      form.type
+                    }
+                    disabled={saving}
                     onChange={(event) =>
                       updateField(
                         "type",
@@ -693,6 +792,7 @@ export default function CreateAssessmentPage() {
                     value={
                       form.purpose
                     }
+                    disabled={saving}
                     onChange={(event) =>
                       updateField(
                         "purpose",
@@ -737,6 +837,7 @@ export default function CreateAssessmentPage() {
                     value={
                       form.technology
                     }
+                    disabled={saving}
                     onChange={(event) =>
                       updateField(
                         "technology",
@@ -796,6 +897,7 @@ export default function CreateAssessmentPage() {
                     value={
                       form.difficulty
                     }
+                    disabled={saving}
                     onChange={(event) =>
                       updateField(
                         "difficulty",
@@ -829,6 +931,10 @@ export default function CreateAssessmentPage() {
 
             </section>
 
+            {/* =================================================
+                ASSESSMENT PLAN
+            ================================================= */}
+
             <section className="form-section">
 
               <h3>
@@ -844,6 +950,7 @@ export default function CreateAssessmentPage() {
                   }
                   min={1}
                   suffix="questions"
+                  disabled={saving}
                   onChange={(value) =>
                     updateField(
                       "plannedQuestions",
@@ -859,6 +966,7 @@ export default function CreateAssessmentPage() {
                   }
                   min={1}
                   suffix="marks"
+                  disabled={saving}
                   onChange={(value) =>
                     updateField(
                       "totalMarks",
@@ -874,6 +982,7 @@ export default function CreateAssessmentPage() {
                   }
                   min={1}
                   suffix="minutes"
+                  disabled={saving}
                   onChange={(value) =>
                     updateField(
                       "durationMinutes",
@@ -899,6 +1008,10 @@ export default function CreateAssessmentPage() {
 
             </section>
 
+            {/* =================================================
+                DESCRIPTION
+            ================================================= */}
+
             <section className="form-section">
 
               <h3>
@@ -909,6 +1022,10 @@ export default function CreateAssessmentPage() {
 
                 <label htmlFor="description">
                   Assessment Description
+
+                  <span className="required">
+                    *
+                  </span>
                 </label>
 
                 <textarea
@@ -919,10 +1036,12 @@ export default function CreateAssessmentPage() {
                   value={
                     form.description
                   }
+                  disabled={saving}
                   onChange={(event) =>
                     updateField(
                       "description",
-                      event.target.value,
+                      event.target
+                        .value,
                     )
                   }
                 />
@@ -948,6 +1067,10 @@ export default function CreateAssessmentPage() {
 
             </section>
 
+            {/* =================================================
+                LEARNER INSTRUCTIONS
+            ================================================= */}
+
             <section className="form-section">
 
               <h3>
@@ -958,6 +1081,10 @@ export default function CreateAssessmentPage() {
 
                 <label htmlFor="instructions">
                   Instructions
+
+                  <span className="required">
+                    *
+                  </span>
                 </label>
 
                 <textarea
@@ -968,10 +1095,12 @@ export default function CreateAssessmentPage() {
                   value={
                     form.instructions
                   }
+                  disabled={saving}
                   onChange={(event) =>
                     updateField(
                       "instructions",
-                      event.target.value,
+                      event.target
+                        .value,
                     )
                   }
                 />
@@ -1000,6 +1129,10 @@ export default function CreateAssessmentPage() {
 
             </section>
 
+            {/* =================================================
+                TAGS
+            ================================================= */}
+
             <section className="form-section">
 
               <h3>
@@ -1016,11 +1149,15 @@ export default function CreateAssessmentPage() {
                   id="tags"
                   type="text"
                   placeholder="C, fundamentals, screening, beginner"
-                  value={form.tags}
+                  value={
+                    form.tags
+                  }
+                  disabled={saving}
                   onChange={(event) =>
                     updateField(
                       "tags",
-                      event.target.value,
+                      event.target
+                        .value,
                     )
                   }
                 />
@@ -1034,15 +1171,18 @@ export default function CreateAssessmentPage() {
 
             </section>
 
+            {/* =================================================
+                FOOTER
+            ================================================= */}
+
             <footer className="assessment-form-footer">
 
               <button
                 type="button"
                 className="cancel-button"
-                onClick={() =>
-                  router.push(
-                    "/assessments",
-                  )
+                disabled={saving}
+                onClick={
+                  cancelAssessment
                 }
               >
                 Cancel
@@ -1050,24 +1190,17 @@ export default function CreateAssessmentPage() {
 
               <div className="footer-actions">
 
-                {/* <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={
-                    saveDraft
-                  }
-                >
-                  Save Draft
-                </button> */}
-
                 <button
                   type="button"
                   className="primary-button"
+                  disabled={saving}
                   onClick={
                     saveAndContinue
                   }
                 >
-                  Save & Continue →
+                  {saving
+                    ? "Creating Assessment..."
+                    : "Save & Continue →"}
                 </button>
 
               </div>
@@ -1083,6 +1216,10 @@ export default function CreateAssessmentPage() {
     </main>
   );
 }
+
+/* ============================================================
+   STEPPER
+   ============================================================ */
 
 interface StepProps {
   number: number;
@@ -1116,11 +1253,16 @@ function Step({
   );
 }
 
+/* ============================================================
+   NUMBER CARD
+   ============================================================ */
+
 interface NumberCardProps {
   label: string;
   value: number;
   min: number;
   suffix: string;
+  disabled?: boolean;
   onChange: (
     value: number,
   ) => void;
@@ -1131,6 +1273,7 @@ function NumberCard({
   value,
   min,
   suffix,
+  disabled = false,
   onChange,
 }: NumberCardProps) {
   return (
@@ -1144,10 +1287,14 @@ function NumberCard({
         type="number"
         min={min}
         value={value}
+        disabled={disabled}
         onChange={(event) =>
           onChange(
-            Number(
-              event.target.value,
+            Math.max(
+              0,
+              Number(
+                event.target.value,
+              ),
             ),
           )
         }
