@@ -1,9 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  useParams,
+  useRouter,
+} from "next/navigation";
+
+import { API_URL } from "@/src/lib/api/fetcher";
 
 import "./scoring.css";
+
+/* ============================================================
+   TYPES
+   ============================================================ */
 
 interface AssessmentDraft {
   id?: string;
@@ -50,6 +64,10 @@ interface ScoringRules {
   autoSubmitOnTimeout: boolean;
 }
 
+/* ============================================================
+   DEFAULT RULES
+   ============================================================ */
+
 const DEFAULT_RULES: ScoringRules = {
   passPercentage: 50,
 
@@ -66,6 +84,10 @@ const DEFAULT_RULES: ScoringRules = {
   autoSubmitOnTimeout: true,
 };
 
+/* ============================================================
+   PAGE
+   ============================================================ */
+
 export default function ScoringRulesPage() {
   const router = useRouter();
   const params = useParams();
@@ -74,150 +96,400 @@ export default function ScoringRulesPage() {
     params.assessmentId as string;
 
   const [assessment, setAssessment] =
-    useState<AssessmentDraft | null>(null);
+    useState<AssessmentDraft | null>(
+      null,
+    );
 
   const [questions, setQuestions] =
-    useState<AssessmentQuestion[]>([]);
+    useState<AssessmentQuestion[]>(
+      [],
+    );
 
   const [rules, setRules] =
     useState<ScoringRules>(
       DEFAULT_RULES,
     );
 
-  
-
   const [errors, setErrors] =
     useState<string[]>([]);
 
-  /*
-  ============================================================
-  LOAD DATA
-  ============================================================
-  */
+  const [loading, setLoading] =
+    useState(true);
+
+  const [saving, setSaving] =
+    useState(false);
+
+  /* ============================================================
+     LOAD DATA
+     ============================================================ */
 
   useEffect(() => {
-
     async function loadData() {
-
       try {
+        setLoading(true);
+
+        console.log(
+          "SCORING LOAD:",
+          assessmentId,
+        );
+
+        console.log(
+          "API URL:",
+          API_URL,
+        );
+
+        /* ======================================================
+           LOAD ASSESSMENT
+           ====================================================== */
 
         const assessmentResponse =
           await fetch(
-            `http://localhost:3001/assessment/${assessmentId}`
+            `${API_URL}/assessment/${assessmentId}`,
+            {
+              method: "GET",
+              cache: "no-store",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            },
           );
 
-
         if (!assessmentResponse.ok) {
-          throw new Error("Assessment not found");
-        }
+          const text =
+            await assessmentResponse.text();
 
+          let message =
+            "Assessment not found.";
+
+          try {
+            const parsed =
+              JSON.parse(text);
+
+            if (
+              Array.isArray(
+                parsed?.message,
+              )
+            ) {
+              message =
+                parsed.message.join(
+                  "; ",
+                );
+            } else if (
+              parsed?.message
+            ) {
+              message =
+                parsed.message;
+            } else if (
+              text.trim()
+            ) {
+              message = text;
+            }
+          } catch {
+            if (text.trim()) {
+              message = text;
+            }
+          }
+
+          throw new Error(
+            message,
+          );
+        }
 
         const assessmentData =
           await assessmentResponse.json();
 
+        /*
+         * Support:
+         *
+         * {
+         *   ...
+         * }
+         *
+         * OR
+         *
+         * {
+         *   data: {...}
+         * }
+         *
+         * OR
+         *
+         * {
+         *   assessment: {...}
+         * }
+         */
+
+        const normalizedAssessment =
+          assessmentData?.assessment ??
+          assessmentData?.data ??
+          assessmentData;
 
         setAssessment({
-
           id:
-            assessmentData.id,
+            normalizedAssessment?.id ??
+            assessmentId,
 
           title:
-            assessmentData.title,
+            normalizedAssessment?.title ??
+            "Assessment",
 
           code:
-            assessmentData.code,
+            normalizedAssessment?.code ??
+            "-",
 
           totalMarks:
-            assessmentData.totalMarks ?? 0,
+            Number(
+              normalizedAssessment?.totalMarks ??
+                0,
+            ),
 
           plannedQuestions:
-            assessmentData.plannedQuestions ?? 0,
+            Number(
+              normalizedAssessment?.plannedQuestions ??
+                0,
+            ),
 
           durationMinutes:
-            assessmentData.durationMinutes ?? 0,
-
+            Number(
+              normalizedAssessment?.durationMinutes ??
+                0,
+            ),
         });
 
-
-
+        /* ======================================================
+           LOAD QUESTIONS
+           ====================================================== */
 
         const questionResponse =
           await fetch(
-            `http://localhost:3001/questions/assessment/${assessmentId}`
+            `${API_URL}/questions/assessment/${assessmentId}`,
+            {
+              method: "GET",
+              cache: "no-store",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            },
           );
 
-
         if (questionResponse.ok) {
-
           const questionData =
             await questionResponse.json();
 
+          /*
+           * Support:
+           *
+           * []
+           *
+           * {
+           *   data: []
+           * }
+           *
+           * {
+           *   questions: []
+           * }
+           */
+
+          const rawQuestions =
+            Array.isArray(
+              questionData,
+            )
+              ? questionData
+              : Array.isArray(
+                  questionData?.data,
+                )
+              ? questionData.data
+              : Array.isArray(
+                  questionData?.questions,
+                )
+              ? questionData.questions
+              : [];
+
+          const normalizedQuestions =
+            rawQuestions
+              .map(
+                (
+                  question: any,
+                  index: number,
+                ): AssessmentQuestion => ({
+                  id: String(
+                    question.id ??
+                      question.questionId ??
+                      `question-${index}`,
+                  ),
+
+                  questionId: String(
+                    question.questionId ??
+                      question.id ??
+                      "",
+                  ),
+
+                  assessmentId:
+                    question.assessmentId
+                      ? String(
+                          question.assessmentId,
+                        )
+                      : undefined,
+
+                  sectionId:
+                    question.sectionId ??
+                    null,
+
+                  sequence:
+                    Number(
+                      question.sequence ??
+                        index + 1,
+                    ),
+
+                  title:
+                    String(
+                      question.title ??
+                        question.question ??
+                        "Untitled Question",
+                    ),
+
+                  type:
+                    String(
+                      question.type ??
+                        "UNKNOWN",
+                    ),
+
+                  technology:
+                    String(
+                      question.technology ??
+                        "-",
+                    ),
+
+                  difficulty:
+                    String(
+                      question.difficulty ??
+                        "-",
+                    ),
+
+                  marks:
+                    Number(
+                      question.marks ??
+                        0,
+                    ),
+
+                  source:
+                    question.source ??
+                    "NEW",
+                }),
+              )
+              .sort(
+                (
+                  a,
+                  b,
+                ) =>
+                  Number(
+                    a.sequence,
+                  ) -
+                  Number(
+                    b.sequence,
+                  ),
+              );
 
           setQuestions(
-            questionData
+            normalizedQuestions,
+          );
+        } else {
+          console.warn(
+            "Unable to load assessment questions.",
           );
 
+          setQuestions([]);
         }
 
-
-
+        /* ======================================================
+           LOAD SCORING
+           ====================================================== */
 
         const scoringResponse =
           await fetch(
-            `http://localhost:3001/scoring/${assessmentId}`
+            `${API_URL}/scoring/${assessmentId}`,
+            {
+              method: "GET",
+              cache: "no-store",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            },
           );
 
-
         if (scoringResponse.ok) {
-
           const scoringText =
             await scoringResponse.text();
 
+          if (scoringText.trim()) {
+            const scoringData =
+              JSON.parse(
+                scoringText,
+              );
 
-          const scoringData =
-            scoringText
-              ? JSON.parse(scoringText)
-              : null;
+            /*
+             * Support:
+             *
+             * {
+             *   ...
+             * }
+             *
+             * OR
+             *
+             * {
+             *   data: {...}
+             * }
+             *
+             * OR
+             *
+             * {
+             *   scoring: {...}
+             * }
+             */
 
-
-          if (scoringData) {
+            const normalizedScoring =
+              scoringData?.scoring ??
+              scoringData?.data ??
+              scoringData;
 
             setRules({
-
               ...DEFAULT_RULES,
-
-              ...scoringData
-
+              ...normalizedScoring,
             });
-
           }
+        } else {
+          /*
+           * No scoring record yet.
+           * Keep default rules.
+           */
+          console.log(
+            "No existing scoring configuration. Using default rules.",
+          );
 
+          setRules(
+            DEFAULT_RULES,
+          );
         }
-
-
-      }
-      catch (error) {
-
+      } catch (error) {
         console.error(
           "Unable to load scoring data.",
-          error
+          error,
         );
-
+      } finally {
+        setLoading(false);
       }
-
     }
 
-
-    loadData();
-
-
+    if (assessmentId) {
+      loadData();
+    }
   }, [assessmentId]);
 
-  /*
-  ============================================================
-  CALCULATED VALUES
-  ============================================================
-  */
+  /* ============================================================
+     CALCULATED VALUES
+     ============================================================ */
 
   const calculatedTotalMarks =
     useMemo(
@@ -229,8 +501,7 @@ export default function ScoringRulesPage() {
           ) =>
             total +
             Number(
-              question.marks ||
-                0,
+              question.marks || 0,
             ),
           0,
         ),
@@ -257,11 +528,9 @@ export default function ScoringRulesPage() {
       rules.passPercentage,
     ]);
 
-  /*
-  ============================================================
-  UPDATE FIELD
-  ============================================================
-  */
+  /* ============================================================
+     UPDATE FIELD
+     ============================================================ */
 
   function updateRule<
     K extends keyof ScoringRules,
@@ -279,15 +548,13 @@ export default function ScoringRulesPage() {
     setErrors([]);
   }
 
-  /*
-  ============================================================
-  VALIDATION
-  ============================================================
-  */
+  /* ============================================================
+     VALIDATION
+     ============================================================ */
 
   function validateRules() {
-    const validationErrors:
-      string[] = [];
+    const validationErrors: string[] =
+      [];
 
     if (totalMarks <= 0) {
       validationErrors.push(
@@ -296,10 +563,8 @@ export default function ScoringRulesPage() {
     }
 
     if (
-      rules.passPercentage <
-        0 ||
-      rules.passPercentage >
-        100
+      rules.passPercentage < 0 ||
+      rules.passPercentage > 100
     ) {
       validationErrors.push(
         "Pass percentage must be between 0 and 100.",
@@ -307,8 +572,7 @@ export default function ScoringRulesPage() {
     }
 
     if (
-      rules.maximumAttempts <
-      1
+      rules.maximumAttempts < 1
     ) {
       validationErrors.push(
         "Maximum attempts must be at least 1.",
@@ -317,8 +581,7 @@ export default function ScoringRulesPage() {
 
     if (
       rules.negativeMarking &&
-      rules.negativeMarkValue <=
-        0
+      rules.negativeMarkValue <= 0
     ) {
       validationErrors.push(
         "Enter a negative mark value greater than zero.",
@@ -330,125 +593,144 @@ export default function ScoringRulesPage() {
     );
 
     return (
-      validationErrors.length ===
-      0
+      validationErrors.length === 0
     );
   }
 
-  /*
-  ============================================================
-  SAVE
-  ============================================================
-  */
+  /* ============================================================
+     SAVE
+     ============================================================ */
 
   async function saveScoring() {
-
-
     const payload = {
-
       assessmentId,
 
-
       passPercentage:
-        rules.passPercentage,
-
+        Number(
+          rules.passPercentage,
+        ),
 
       maximumAttempts:
-        rules.maximumAttempts,
-
+        Number(
+          rules.maximumAttempts,
+        ),
 
       negativeMarking:
         rules.negativeMarking,
 
-
       negativeMarkValue:
         rules.negativeMarking
-          ? rules.negativeMarkValue
+          ? Number(
+              rules.negativeMarkValue,
+            )
           : null,
-
 
       partialMarking:
         rules.partialMarking,
 
-
       allowBackNavigation:
         rules.allowBackNavigation,
-
 
       allowQuestionSkip:
         rules.allowQuestionSkip,
 
-
       autoSubmitOnTimeout:
         rules.autoSubmitOnTimeout,
-
     };
 
-
-
     try {
+      setSaving(true);
 
+      console.log(
+        "SAVING SCORING:",
+        payload,
+      );
 
       const response =
         await fetch(
-          "http://localhost:3001/scoring",
+          `${API_URL}/scoring`,
           {
-
-            method:
-              "POST",
-
+            method: "POST",
 
             headers: {
-
               "Content-Type":
                 "application/json",
-
             },
 
-
             body:
-              JSON.stringify(payload),
-
-          }
+              JSON.stringify(
+                payload,
+              ),
+          },
         );
-
-
 
       if (!response.ok) {
+        const text =
+          await response.text();
+
+        let message =
+          "Unable to save scoring rules.";
+
+        try {
+          const parsed =
+            JSON.parse(text);
+
+          if (
+            Array.isArray(
+              parsed?.message,
+            )
+          ) {
+            message =
+              parsed.message.join(
+                "; ",
+              );
+          } else if (
+            parsed?.message
+          ) {
+            message =
+              parsed.message;
+          } else if (
+            text.trim()
+          ) {
+            message = text;
+          }
+        } catch {
+          if (text.trim()) {
+            message = text;
+          }
+        }
 
         throw new Error(
-          "Unable to save scoring rules"
+          message,
         );
-
       }
 
-
-      console.log("Scoring saved successfully");
-
-      return true;
-
-
-    }
-    catch(error) {
-
-      console.error(
-        "Save scoring failed:",
-        error
+      console.log(
+        "Scoring saved successfully.",
       );
 
+      return true;
+    } catch (error) {
+      console.error(
+        "Save scoring failed:",
+        error,
+      );
+
+      setErrors([
+        error instanceof Error
+          ? error.message
+          : "Unable to save scoring rules.",
+      ]);
+
       return false;
-
+    } finally {
+      setSaving(false);
     }
-
-
   }
 
-
-  /*
-  ============================================================
-  CONTINUE
-  ============================================================
-  */
+  /* ============================================================
+     CONTINUE
+     ============================================================ */
 
   async function saveAndContinue() {
     if (!validateRules()) {
@@ -458,37 +740,54 @@ export default function ScoringRulesPage() {
     const saved =
       await saveScoring();
 
-
-    if(saved){
-
+    if (saved) {
       router.push(
         `/assessments/${assessmentId}/delivery`,
       );
-
     }
   }
 
-  /*
-  ============================================================
-  MISSING DATA
-  ============================================================
-  */
+  /* ============================================================
+     LOADING
+     ============================================================ */
+
+  if (loading) {
+    return (
+      <main className="scoring-page">
+        <div className="scoring-container">
+          <div className="missing-card">
+            <h2>
+              Loading scoring configuration...
+            </h2>
+
+            <p>
+              Loading assessment,
+              questions and existing
+              scoring rules.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  /* ============================================================
+     MISSING DATA
+     ============================================================ */
 
   if (!assessment) {
     return (
       <main className="scoring-page">
         <div className="scoring-container">
-
           <div className="missing-card">
-
             <h2>
               Assessment data not found
             </h2>
 
             <p>
-              Complete the assessment setup
-              before configuring scoring
-              rules.
+              Complete the assessment
+              setup before configuring
+              scoring rules.
             </p>
 
             <button
@@ -502,23 +801,18 @@ export default function ScoringRulesPage() {
             >
               Return to Assessments
             </button>
-
           </div>
-
         </div>
       </main>
     );
   }
 
-  /*
-  ============================================================
-  UI
-  ============================================================
-  */
+  /* ============================================================
+     UI
+     ============================================================ */
 
   return (
     <main className="scoring-page">
-
       <div className="scoring-container">
 
         {/* ====================================================
@@ -526,9 +820,7 @@ export default function ScoringRulesPage() {
         ==================================================== */}
 
         <header className="scoring-header">
-
           <div>
-
             <button
               type="button"
               className="back-link"
@@ -554,11 +846,9 @@ export default function ScoringRulesPage() {
               marking behavior and learner
               attempt rules.
             </p>
-
           </div>
 
           <div className="assessment-chip">
-
             <span>
               {assessment.code}
             </span>
@@ -570,9 +860,7 @@ export default function ScoringRulesPage() {
             <small>
               Draft
             </small>
-
           </div>
-
         </header>
 
         {/* ====================================================
@@ -580,7 +868,6 @@ export default function ScoringRulesPage() {
         ==================================================== */}
 
         <section className="assessment-stepper">
-
           <StepperItem
             number="1"
             label="Setup"
@@ -613,7 +900,6 @@ export default function ScoringRulesPage() {
             number="6"
             label="Publish"
           />
-
         </section>
 
         {/* ====================================================
@@ -621,7 +907,6 @@ export default function ScoringRulesPage() {
         ==================================================== */}
 
         <section className="summary-strip">
-
           <SummaryItem
             label="Questions"
             value={`${questions.length} / ${assessment.plannedQuestions}`}
@@ -642,7 +927,6 @@ export default function ScoringRulesPage() {
             value={`${passMarks}`}
             emphasized
           />
-
         </section>
 
         {/* ====================================================
@@ -650,15 +934,12 @@ export default function ScoringRulesPage() {
         ==================================================== */}
 
         <section className="rules-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               1
             </span>
 
             <div>
-
               <h2>
                 Scoring
               </h2>
@@ -667,15 +948,12 @@ export default function ScoringRulesPage() {
                 Set the assessment passing
                 requirement.
               </p>
-
             </div>
-
           </div>
 
           <div className="form-grid three-columns">
 
             <label className="form-field">
-
               <span>
                 Total Marks
               </span>
@@ -690,17 +968,14 @@ export default function ScoringRulesPage() {
                 Calculated from assessment
                 questions.
               </small>
-
             </label>
 
             <label className="form-field">
-
               <span>
                 Pass Percentage
               </span>
 
               <div className="unit-field">
-
                 <input
                   type="number"
                   min={0}
@@ -727,13 +1002,10 @@ export default function ScoringRulesPage() {
                 <span>
                   %
                 </span>
-
               </div>
-
             </label>
 
             <label className="form-field">
-
               <span>
                 Pass Marks
               </span>
@@ -747,11 +1019,9 @@ export default function ScoringRulesPage() {
               <small>
                 Calculated automatically.
               </small>
-
             </label>
 
           </div>
-
         </section>
 
         {/* ====================================================
@@ -759,15 +1029,12 @@ export default function ScoringRulesPage() {
         ==================================================== */}
 
         <section className="rules-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               2
             </span>
 
             <div>
-
               <h2>
                 Attempts & Marking
               </h2>
@@ -776,15 +1043,11 @@ export default function ScoringRulesPage() {
                 Configure retries and how
                 marks are awarded.
               </p>
-
             </div>
-
           </div>
 
           <div className="form-grid two-columns">
-
             <label className="form-field">
-
               <span>
                 Maximum Attempts
               </span>
@@ -808,11 +1071,9 @@ export default function ScoringRulesPage() {
                   )
                 }
               />
-
             </label>
 
             <div className="empty-field" />
-
           </div>
 
           <div className="toggle-list">
@@ -853,11 +1114,8 @@ export default function ScoringRulesPage() {
             />
 
             {rules.negativeMarking && (
-
               <div className="nested-rule">
-
                 <label className="form-field compact-field">
-
                   <span>
                     Marks Deducted per Wrong Answer
                   </span>
@@ -881,15 +1139,11 @@ export default function ScoringRulesPage() {
                       )
                     }
                   />
-
                 </label>
-
               </div>
-
             )}
 
           </div>
-
         </section>
 
         {/* ====================================================
@@ -897,15 +1151,12 @@ export default function ScoringRulesPage() {
         ==================================================== */}
 
         <section className="rules-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               3
             </span>
 
             <div>
-
               <h2>
                 Assessment Rules
               </h2>
@@ -914,9 +1165,7 @@ export default function ScoringRulesPage() {
                 Control learner navigation
                 and completion behavior.
               </p>
-
             </div>
-
           </div>
 
           <div className="toggle-list">
@@ -964,7 +1213,6 @@ export default function ScoringRulesPage() {
             />
 
           </div>
-
         </section>
 
         {/* ====================================================
@@ -972,9 +1220,7 @@ export default function ScoringRulesPage() {
         ==================================================== */}
 
         {errors.length > 0 && (
-
           <section className="validation-panel">
-
             <strong>
               Complete the scoring
               configuration before
@@ -982,23 +1228,20 @@ export default function ScoringRulesPage() {
             </strong>
 
             <ul>
-
               {errors.map(
-                (error, index) => (
-
+                (
+                  error,
+                  index,
+                ) => (
                   <li
                     key={`${error}-${index}`}
                   >
                     {error}
                   </li>
-
                 ),
               )}
-
             </ul>
-
           </section>
-
         )}
 
         {/* ====================================================
@@ -1006,10 +1249,10 @@ export default function ScoringRulesPage() {
         ==================================================== */}
 
         <footer className="scoring-footer">
-
           <button
             type="button"
             className="secondary-button"
+            disabled={saving}
             onClick={() =>
               router.push(
                 `/assessments/${assessmentId}/questions`,
@@ -1020,23 +1263,22 @@ export default function ScoringRulesPage() {
           </button>
 
           <div className="footer-actions">
-
             <button
               type="button"
               className="primary-button"
+              disabled={saving}
               onClick={
                 saveAndContinue
               }
             >
-              Continue →
+              {saving
+                ? "Saving..."
+                : "Continue →"}
             </button>
-
           </div>
-
         </footer>
 
       </div>
-
     </main>
   );
 }
@@ -1061,22 +1303,24 @@ function StepperItem({
   return (
     <div
       className={`stepper-item ${
-        active ? "active" : ""
+        active
+          ? "active"
+          : ""
       } ${
         complete
           ? "complete"
           : ""
       }`}
     >
-
       <span className="step-number">
-        {complete ? "✓" : number}
+        {complete
+          ? "✓"
+          : number}
       </span>
 
       <span>
         {label}
       </span>
-
     </div>
   );
 }
@@ -1104,7 +1348,6 @@ function SummaryItem({
           : ""
       }`}
     >
-
       <span>
         {label}
       </span>
@@ -1112,7 +1355,6 @@ function SummaryItem({
       <strong>
         {value}
       </strong>
-
     </div>
   );
 }
@@ -1138,9 +1380,7 @@ function RuleToggle({
 }: RuleToggleProps) {
   return (
     <div className="rule-toggle-row">
-
       <div className="rule-description">
-
         <strong>
           {title}
         </strong>
@@ -1148,11 +1388,9 @@ function RuleToggle({
         <p>
           {description}
         </p>
-
       </div>
 
       <label className="switch">
-
         <input
           type="checkbox"
           checked={checked}
@@ -1164,9 +1402,7 @@ function RuleToggle({
         />
 
         <span className="slider" />
-
       </label>
-
     </div>
   );
 }
