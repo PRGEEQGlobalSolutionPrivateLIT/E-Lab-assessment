@@ -2909,8 +2909,8 @@ export default function EnvironmentPage() {
               >
 
                 Attempts Allowed: {
-                  assessment?.maximumAttempts > 0
-                    ? assessment.maximumAttempts
+                  (assessment?.maximumAttempts ?? 0) > 0
+                    ? (assessment?.maximumAttempts ?? 0)
                     : "-"
                 }
 
