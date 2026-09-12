@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { API_URL } from "@/src/lib/api/fetcher";
+import { API_URL } from "@/lib/api/fetcher";
 
 import "./delivery.css";
 
