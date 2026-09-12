@@ -173,23 +173,15 @@ export default function DeliveryPage() {
 
   const params = useParams();
 
-  const assessmentId =
-    params.assessmentId as string;
+  const assessmentId = params.assessmentId as string;
 
   const [assessment, setAssessment] =
-    useState<AssessmentDraft | null>(
-      null,
-    );
+    useState<AssessmentDraft | null>(null);
 
   const [delivery, setDelivery] =
-    useState<DeliverySettings>(
-      DEFAULT_DELIVERY,
-    );
+    useState<DeliverySettings>(DEFAULT_DELIVERY);
 
-  const [errors, setErrors] =
-    useState<string[]>([]);
-
-
+  const [errors, setErrors] = useState<string[]>([]);
 
   /* ============================================================
      LOAD
@@ -197,23 +189,15 @@ export default function DeliveryPage() {
 
   useEffect(() => {
     async function loadAssessment() {
-
       try {
+        const response = await fetch(
+          `${API_URL}/assessment/${assessmentId}`,
+        );
 
-        const response =
-          await fetch(
-            `http://localhost:3001/assessment/${assessmentId}`
-          );
-
-
-        if(response.ok){
-
-          const data =
-            await response.json();
-
+        if (response.ok) {
+          const data = await response.json();
 
           setAssessment({
-
             id: data.id,
 
             title: data.title,
@@ -225,116 +209,70 @@ export default function DeliveryPage() {
             plannedQuestions: data.plannedQuestions ?? 0,
 
             durationMinutes: data.durationMinutes ?? 0,
-
           });
-
         }
-
-
-      }
-      catch(error){
-
+      } catch (error) {
         console.error(
           "Unable to load assessment:",
-          error
+          error,
         );
-
       }
-
     }
-
-
 
     loadAssessment();
 
-
-
     async function loadDelivery() {
-
       try {
-
-        const response =
-          await fetch(
-            `http://localhost:3001/delivery/${assessmentId}`
-          );
-
+        const response = await fetch(
+          `${API_URL}/delivery/${assessmentId}`,
+        );
 
         if (response.ok) {
-
-          const data =
-            await response.json();
-
+          const data = await response.json();
 
           if (data) {
-
-
             setDelivery({
-
               ...DEFAULT_DELIVERY,
-
 
               ...(data.delivery ?? {}),
 
-
               ...(data.security ?? {}),
 
+              startDate: data.delivery?.startsAt
+                ? new Date(data.delivery.startsAt)
+                    .toISOString()
+                    .split("T")[0]
+                : "",
 
+              startTime: data.delivery?.startsAt
+                ? new Date(data.delivery.startsAt)
+                    .toISOString()
+                    .substring(11, 16)
+                : "",
 
-              startDate:
-                data.delivery?.startsAt
-                  ? new Date(data.delivery.startsAt)
-                      .toISOString()
-                      .split("T")[0]
-                  : "",
+              endDate: data.delivery?.endsAt
+                ? new Date(data.delivery.endsAt)
+                    .toISOString()
+                    .split("T")[0]
+                : "",
 
-
-
-              startTime:
-                data.delivery?.startsAt
-                  ? new Date(data.delivery.startsAt)
-                      .toISOString()
-                      .substring(11,16)
-                  : "",
-
-
-
-              endDate:
-                data.delivery?.endsAt
-                  ? new Date(data.delivery.endsAt)
-                      .toISOString()
-                      .split("T")[0]
-                  : "",
-
-
-
-              endTime:
-                data.delivery?.endsAt
-                  ? new Date(data.delivery.endsAt)
-                      .toISOString()
-                      .substring(11,16)
-                  : "",
-
-
+              endTime: data.delivery?.endsAt
+                ? new Date(data.delivery.endsAt)
+                    .toISOString()
+                    .substring(11, 16)
+                : "",
             });
 
-
             return;
-
           }
-
         }
-
-      } catch(error) {
-
+      } catch (error) {
         console.error(
           "Unable to load delivery from backend:",
-          error
+          error,
         );
-
       }
-
     }
-
 
     loadDelivery();
   }, [assessmentId]);
@@ -343,21 +281,16 @@ export default function DeliveryPage() {
      UPDATE FIELD
      ============================================================ */
 
-  function updateField<
-    K extends keyof DeliverySettings,
-  >(
+  function updateField<K extends keyof DeliverySettings>(
     field: K,
     value: DeliverySettings[K],
   ) {
-    setDelivery(
-      (current) => ({
-        ...current,
-        [field]: value,
-      }),
-    );
+    setDelivery((current) => ({
+      ...current,
+      [field]: value,
+    }));
 
     setErrors([]);
-
   }
 
   /* ============================================================
@@ -365,8 +298,7 @@ export default function DeliveryPage() {
      ============================================================ */
 
   function validateDelivery() {
-    const validationErrors:
-      string[] = [];
+    const validationErrors: string[] = [];
 
     /* Availability */
 
@@ -396,19 +328,21 @@ export default function DeliveryPage() {
 
     if (
       (delivery.startDate ?? "") &&
-      (delivery.startTime ?? "" )&&
+      (delivery.startTime ?? "") &&
       (delivery.endDate ?? "") &&
       (delivery.endTime ?? "")
     ) {
-      const start =
-        new Date(
-          `${delivery.startDate ?? ""}T${delivery.startTime ?? ""}`,
-        );
+      const start = new Date(
+        `${delivery.startDate ?? ""}T${
+          delivery.startTime ?? ""
+        }`,
+      );
 
-      const end =
-        new Date(
-          `${delivery.endDate ?? ""}T${delivery.endTime ?? ""}`,
-        );
+      const end = new Date(
+        `${delivery.endDate ?? ""}T${
+          delivery.endTime ?? ""
+        }`,
+      );
 
       if (end <= start) {
         validationErrors.push(
@@ -420,10 +354,8 @@ export default function DeliveryPage() {
     /* Assignment */
 
     if (
-      (delivery.audienceType ===
-        "BATCH" ||
-        delivery.audienceType ===
-          "GROUP") &&
+      (delivery.audienceType === "BATCH" ||
+        delivery.audienceType === "GROUP") &&
       !(delivery.batchOrGroup ?? "").trim()
     ) {
       validationErrors.push(
@@ -443,19 +375,13 @@ export default function DeliveryPage() {
 
     /* Advanced Security */
 
-    if (
-      delivery.maximumTabSwitches <
-      0
-    ) {
+    if (delivery.maximumTabSwitches < 0) {
       validationErrors.push(
         "Maximum tab switches cannot be negative.",
       );
     }
 
-    if (
-      delivery.violationLimit <
-      1
-    ) {
+    if (delivery.violationLimit < 1) {
       validationErrors.push(
         "Security violation limit must be at least 1.",
       );
@@ -470,14 +396,9 @@ export default function DeliveryPage() {
       );
     }
 
-    setErrors(
-      validationErrors,
-    );
+    setErrors(validationErrors);
 
-    return (
-      validationErrors.length ===
-      0
-    );
+    return validationErrors.length === 0;
   }
 
   /* ============================================================
@@ -485,30 +406,22 @@ export default function DeliveryPage() {
      ============================================================ */
 
   async function saveDelivery(): Promise<boolean> {
-
-
     const payload = {
-
       assessmentId,
 
-
       // Availability
-      startDate:
-        delivery.startDate ?? "",
 
-      startTime:
-        delivery.startTime ?? "",
+      startDate: delivery.startDate ?? "",
 
-      endDate:
-        delivery.endDate ?? "",
+      startTime: delivery.startTime ?? "",
 
-      endTime:
-        delivery.endTime ?? "",
+      endDate: delivery.endDate ?? "",
 
+      endTime: delivery.endTime ?? "",
 
       // Assignment
-      audienceType:
-        delivery.audienceType,
+
+      audienceType: delivery.audienceType,
 
       batchOrGroup:
         delivery.batchOrGroup ?? "",
@@ -516,13 +429,12 @@ export default function DeliveryPage() {
       selectedLearners:
         delivery.selectedLearners ?? "",
 
-
       // AI Policy
-      aiPolicy:
-        delivery.aiPolicy,
 
+      aiPolicy: delivery.aiPolicy,
 
       // Security
+
       fullscreenMode:
         Boolean(delivery.fullscreenMode),
 
@@ -539,37 +451,47 @@ export default function DeliveryPage() {
         Boolean(delivery.textSelectionDetection),
 
       textSelectionRestriction:
-        Boolean(delivery.textSelectionRestriction),
+        Boolean(
+          delivery.textSelectionRestriction,
+        ),
 
       autoSubmitOnViolation:
-        Boolean(delivery.autoSubmitOnViolation),
-
+        Boolean(
+          delivery.autoSubmitOnViolation,
+        ),
 
       // Advanced Security
-      maximumTabSwitches:
-        Number(delivery.maximumTabSwitches ?? 0),
 
-      violationLimit:
-        Number(delivery.violationLimit ?? 1),
+      maximumTabSwitches: Number(
+        delivery.maximumTabSwitches ?? 0,
+      ),
+
+      violationLimit: Number(
+        delivery.violationLimit ?? 1,
+      ),
 
       allowedIpAddresses:
         delivery.allowedIpAddresses ?? "",
 
-      devicePolicy:
-        delivery.devicePolicy,
-
+      devicePolicy: delivery.devicePolicy,
 
       cameraProctoring:
         Boolean(delivery.cameraProctoring),
 
       microphoneMonitoring:
-        Boolean(delivery.microphoneMonitoring),
+        Boolean(
+          delivery.microphoneMonitoring,
+        ),
 
       identityVerification:
-        Boolean(delivery.identityVerification),
+        Boolean(
+          delivery.identityVerification,
+        ),
 
       blockBrowserExtensions:
-        Boolean(delivery.blockBrowserExtensions),
+        Boolean(
+          delivery.blockBrowserExtensions,
+        ),
 
       disableRightClick:
         Boolean(delivery.disableRightClick),
@@ -579,158 +501,109 @@ export default function DeliveryPage() {
 
       preventScreenshots:
         Boolean(delivery.preventScreenshots),
-
     };
 
-
-
     try {
-
+      console.log(
+        "DELIVERY API URL:",
+        API_URL,
+      );
 
       console.log(
         "DELIVERY REQUEST PAYLOAD:",
         JSON.stringify(
           payload,
           null,
-          2
-        )
+          2,
+        ),
       );
 
+      const response = await fetch(
+        `${API_URL}/delivery`,
+        {
+          method: "POST",
 
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
 
-      const response =
-        await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001"}/delivery`,
-          {
-
-            method:"POST",
-
-            headers:{
-              "Content-Type":"application/json",
-            },
-
-            body:
-              JSON.stringify(payload),
-
-          }
-        );
-
-
+          body: JSON.stringify(payload),
+        },
+      );
 
       console.log(
         "DELIVERY STATUS:",
-        response.status
+        response.status,
       );
-
-
 
       console.log(
         "DELIVERY HEADERS:",
-        [...response.headers.entries()]
+        [
+          ...response.headers.entries(),
+        ],
       );
-
-
 
       let responseText = "";
 
       try {
-
         responseText =
           await response.text();
-
-      }
-
-      catch(error){
-
+      } catch (error) {
         console.error(
           "RESPONSE READ ERROR:",
-          error
+          error,
         );
-
       }
-
-
 
       console.log(
         "DELIVERY RESPONSE BODY:",
-        responseText
+        responseText,
       );
 
-
-
-      if(!response.ok){
-
-
+      if (!response.ok) {
         alert(
           `Unable to save delivery
 
 Status: ${response.status}
 
-${responseText}`
+${responseText}`,
         );
 
-
         return false;
-
-
       }
 
-
-
       return true;
-
-
-
-    }
-
-    catch(error){
-
-
+    } catch (error) {
       console.error(
         "DELIVERY SAVE ERROR:",
-        error
+        error,
       );
-
 
       alert(
-        "Delivery API connection failed"
+        "Delivery API connection failed",
       );
 
-
       return false;
-
-
     }
-
-
   }
-
 
   /* ============================================================
      SAVE & CONTINUE
      ============================================================ */
 
   async function saveAndContinue() {
-
     if (!validateDelivery()) {
-
       return;
-
     }
 
+    const saved = await saveDelivery();
 
-    const saved =
-      await saveDelivery();
-
-
-    if(saved) {
-
+    if (saved) {
       router.push(
         `/assessments/${assessmentId}/review`,
       );
-
     }
-
   }
 
   /* ============================================================
@@ -740,11 +613,8 @@ ${responseText}`
   if (!assessment) {
     return (
       <main className="delivery-page">
-
         <div className="delivery-container">
-
           <div className="missing-card">
-
             <h2>
               Assessment data not found
             </h2>
@@ -766,11 +636,8 @@ ${responseText}`
             >
               Return to Assessments
             </button>
-
           </div>
-
         </div>
-
       </main>
     );
   }
@@ -781,17 +648,11 @@ ${responseText}`
 
   return (
     <main className="delivery-page">
-
       <div className="delivery-container">
-
-        {/* ====================================================
-            HEADER
-        ==================================================== */}
+        {/* HEADER */}
 
         <header className="delivery-header">
-
           <div>
-
             <button
               type="button"
               className="back-link"
@@ -808,20 +669,16 @@ ${responseText}`
               STEP 4 OF 6
             </span>
 
-            <h1>
-              Delivery
-            </h1>
+            <h1>Delivery</h1>
 
             <p>
               Define availability,
               assignment, AI access and
               assessment security.
             </p>
-
           </div>
 
           <div className="assessment-chip">
-
             <span>
               {assessment.code}
             </span>
@@ -830,20 +687,13 @@ ${responseText}`
               {assessment.title}
             </strong>
 
-            <small>
-              Draft
-            </small>
-
+            <small>Draft</small>
           </div>
-
         </header>
 
-        {/* ====================================================
-            STEPPER
-        ==================================================== */}
+        {/* STEPPER */}
 
         <section className="assessment-stepper">
-
           <StepperItem
             number="1"
             label="Setup"
@@ -877,43 +727,29 @@ ${responseText}`
             number="6"
             label="Publish"
           />
-
         </section>
 
-        {/* ====================================================
-            1. AVAILABILITY
-        ==================================================== */}
+        {/* AVAILABILITY */}
 
         <section className="delivery-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               1
             </span>
 
             <div>
-
-              <h2>
-                Availability
-              </h2>
+              <h2>Availability</h2>
 
               <p>
                 Define when learners can
                 access the assessment.
               </p>
-
             </div>
-
           </div>
 
           <div className="form-grid four-columns">
-
             <label className="form-field">
-
-              <span>
-                Start Date *
-              </span>
+              <span>Start Date *</span>
 
               <input
                 type="date"
@@ -927,14 +763,10 @@ ${responseText}`
                   )
                 }
               />
-
             </label>
 
             <label className="form-field">
-
-              <span>
-                Start Time *
-              </span>
+              <span>Start Time *</span>
 
               <input
                 type="time"
@@ -948,14 +780,10 @@ ${responseText}`
                   )
                 }
               />
-
             </label>
 
             <label className="form-field">
-
-              <span>
-                End Date *
-              </span>
+              <span>End Date *</span>
 
               <input
                 type="date"
@@ -969,14 +797,10 @@ ${responseText}`
                   )
                 }
               />
-
             </label>
 
             <label className="form-field">
-
-              <span>
-                End Time *
-              </span>
+              <span>End Time *</span>
 
               <input
                 type="time"
@@ -990,61 +814,42 @@ ${responseText}`
                   )
                 }
               />
-
             </label>
-
           </div>
 
           <div className="availability-note">
-
             <strong>
               Assessment Duration:
             </strong>
 
             <span>
-              {assessment.durationMinutes}
-              {" "}
+              {assessment.durationMinutes}{" "}
               minutes per attempt
             </span>
-
           </div>
-
         </section>
 
-        {/* ====================================================
-            2. ASSIGNMENT
-        ==================================================== */}
+        {/* ASSIGNMENT */}
 
         <section className="delivery-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               2
             </span>
 
             <div>
-
-              <h2>
-                Assignment
-              </h2>
+              <h2>Assignment</h2>
 
               <p>
                 Define who should receive
                 this assessment.
               </p>
-
             </div>
-
           </div>
 
           <div className="form-grid two-columns">
-
             <label className="form-field">
-
-              <span>
-                Audience Type
-              </span>
+              <span>Audience Type</span>
 
               <select
                 value={
@@ -1058,7 +863,6 @@ ${responseText}`
                   )
                 }
               >
-
                 <option value="ALL_LEARNERS">
                   All Learners
                 </option>
@@ -1074,18 +878,14 @@ ${responseText}`
                 <option value="GROUP">
                   Group
                 </option>
-
               </select>
-
             </label>
 
             {(delivery.audienceType ===
               "BATCH" ||
               delivery.audienceType ===
                 "GROUP") && (
-
               <label className="form-field">
-
                 <span>
                   {delivery.audienceType ===
                   "BATCH"
@@ -1096,7 +896,8 @@ ${responseText}`
                 <input
                   type="text"
                   value={
-                    delivery.batchOrGroup ?? ""
+                    delivery.batchOrGroup ??
+                    ""
                   }
                   onChange={(event) =>
                     updateField(
@@ -1111,16 +912,12 @@ ${responseText}`
                       : "Example: Graduate Trainees"
                   }
                 />
-
               </label>
-
             )}
 
             {delivery.audienceType ===
               "SELECTED_LEARNERS" && (
-
               <label className="form-field full-width">
-
                 <span>
                   Selected Learners *
                 </span>
@@ -1128,7 +925,8 @@ ${responseText}`
                 <textarea
                   rows={4}
                   value={
-                    delivery.selectedLearners ?? ""
+                    delivery.selectedLearners ??
+                    ""
                   }
                   onChange={(event) =>
                     updateField(
@@ -1146,50 +944,33 @@ ${responseText}`
                   replaced by learner
                   search and multi-select.
                 </small>
-
               </label>
-
             )}
-
           </div>
-
         </section>
 
-        {/* ====================================================
-            3. AI POLICY
-        ==================================================== */}
+        {/* AI POLICY */}
 
         <section className="delivery-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               3
             </span>
 
             <div>
-
-              <h2>
-                AI Policy
-              </h2>
+              <h2>AI Policy</h2>
 
               <p>
                 Decide whether learners
                 may use platform-provided
                 AI assistance.
               </p>
-
             </div>
-
           </div>
 
           <div className="form-grid two-columns">
-
             <label className="form-field">
-
-              <span>
-                AI Assistance
-              </span>
+              <span>AI Assistance</span>
 
               <select
                 value={
@@ -1203,7 +984,6 @@ ${responseText}`
                   )
                 }
               >
-
                 <option value="DISABLED">
                   Disabled
                 </option>
@@ -1219,13 +999,10 @@ ${responseText}`
                 <option value="FULL">
                   Full Assistance
                 </option>
-
               </select>
-
             </label>
 
             <div className="ai-policy-info">
-
               {delivery.aiPolicy ===
                 "DISABLED" && (
                 <p>
@@ -1261,45 +1038,30 @@ ${responseText}`
                   during the assessment.
                 </p>
               )}
-
             </div>
-
           </div>
-
         </section>
 
-        {/* ====================================================
-            4. SECURITY
-        ==================================================== */}
+        {/* SECURITY */}
 
         <section className="delivery-card">
-
           <div className="section-heading">
-
             <span className="section-number">
               4
             </span>
 
             <div>
-
-              <h2>
-                Security
-              </h2>
+              <h2>Security</h2>
 
               <p>
                 Apply assessment integrity
                 controls and violation
                 monitoring.
               </p>
-
             </div>
-
           </div>
 
-          {/* BASIC SECURITY */}
-
           <div className="toggle-list">
-
             <DeliveryToggle
               title="Fullscreen Mode"
               description="Request learners to keep the assessment workspace in fullscreen mode."
@@ -1397,25 +1159,20 @@ ${responseText}`
                 )
               }
             />
-
           </div>
 
-          {/* ====================================================
-              ADVANCED SECURITY
-          ==================================================== */}
+          {/* ADVANCED SECURITY */}
 
           <details className="advanced-security">
-
             <summary>
               Advanced Security
             </summary>
 
             <div className="advanced-security-content">
-
               <div className="advanced-security-intro">
-
                 <strong>
-                  Advanced assessment controls
+                  Advanced assessment
+                  controls
                 </strong>
 
                 <p>
@@ -1425,15 +1182,12 @@ ${responseText}`
                   stronger assessment
                   integrity is required.
                 </p>
-
               </div>
 
               {/* LIMITS + DEVICE + NETWORK */}
 
               <div className="form-grid two-columns">
-
                 <label className="form-field">
-
                   <span>
                     Maximum Tab Switches
                   </span>
@@ -1465,13 +1219,12 @@ ${responseText}`
                     switches permitted.
                     Use 0 for unlimited.
                   </small>
-
                 </label>
 
                 <label className="form-field">
-
                   <span>
-                    Security Violation Limit
+                    Security Violation
+                    Limit
                   </span>
 
                   <input
@@ -1499,11 +1252,9 @@ ${responseText}`
                     permitted before the
                     configured action.
                   </small>
-
                 </label>
 
                 <label className="form-field">
-
                   <span>
                     Device Policy
                   </span>
@@ -1520,7 +1271,6 @@ ${responseText}`
                       )
                     }
                   >
-
                     <option value="ANY">
                       Any Device
                     </option>
@@ -1532,7 +1282,6 @@ ${responseText}`
                     <option value="REGISTERED_DEVICE">
                       Registered Device Only
                     </option>
-
                   </select>
 
                   <small>
@@ -1540,11 +1289,9 @@ ${responseText}`
                     device allowed to launch
                     this assessment.
                   </small>
-
                 </label>
 
                 <label className="form-field">
-
                   <span>
                     Allowed IP Addresses
                   </span>
@@ -1552,7 +1299,8 @@ ${responseText}`
                   <textarea
                     rows={4}
                     value={
-                      delivery.allowedIpAddresses ?? ""
+                      delivery.allowedIpAddresses ??
+                      ""
                     }
                     onChange={(event) =>
                       updateField(
@@ -1569,17 +1317,13 @@ ${responseText}`
                     Later this can support
                     IP ranges and CIDR.
                   </small>
-
                 </label>
-
               </div>
 
               {/* PROCTORING */}
 
               <div className="advanced-group">
-
                 <div className="advanced-group-heading">
-
                   <h3>
                     Proctoring
                   </h3>
@@ -1589,11 +1333,9 @@ ${responseText}`
                     identity and remote
                     supervision.
                   </p>
-
                 </div>
 
                 <div className="advanced-toggle-list">
-
                   <DeliveryToggle
                     title="Camera Proctoring"
                     description="Require camera access and maintain camera availability during the assessment."
@@ -1635,19 +1377,16 @@ ${responseText}`
                       )
                     }
                   />
-
                 </div>
-
               </div>
 
               {/* BROWSER / CONTENT PROTECTION */}
 
               <div className="advanced-group">
-
                 <div className="advanced-group-heading">
-
                   <h3>
-                    Browser & Content Protection
+                    Browser & Content
+                    Protection
                   </h3>
 
                   <p>
@@ -1656,11 +1395,9 @@ ${responseText}`
                     be copied or accessed
                     outside the workspace.
                   </p>
-
                 </div>
 
                 <div className="advanced-toggle-list">
-
                   <DeliveryToggle
                     title="Block Browser Extensions"
                     description="Detect or restrict unsupported browser extensions where technically supported."
@@ -1716,25 +1453,16 @@ ${responseText}`
                       )
                     }
                   />
-
                 </div>
-
               </div>
-
             </div>
-
           </details>
-
         </section>
 
-        {/* ====================================================
-            VALIDATION
-        ==================================================== */}
+        {/* VALIDATION */}
 
         {errors.length > 0 && (
-
           <section className="validation-panel">
-
             <strong>
               Complete the delivery
               configuration before
@@ -1742,31 +1470,22 @@ ${responseText}`
             </strong>
 
             <ul>
-
               {errors.map(
                 (error, index) => (
-
                   <li
                     key={`${error}-${index}`}
                   >
                     {error}
                   </li>
-
                 ),
               )}
-
             </ul>
-
           </section>
-
         )}
 
-        {/* ====================================================
-            FOOTER
-        ==================================================== */}
+        {/* FOOTER */}
 
         <footer className="delivery-footer">
-
           <button
             type="button"
             className="secondary-button"
@@ -1780,7 +1499,6 @@ ${responseText}`
           </button>
 
           <div className="footer-actions">
-
             <button
               type="button"
               className="primary-button"
@@ -1790,13 +1508,9 @@ ${responseText}`
             >
               Continue →
             </button>
-
           </div>
-
         </footer>
-
       </div>
-
     </main>
   );
 }
@@ -1821,26 +1535,16 @@ function StepperItem({
   return (
     <div
       className={`stepper-item ${
-        active
-          ? "active"
-          : ""
+        active ? "active" : ""
       } ${
-        complete
-          ? "complete"
-          : ""
+        complete ? "complete" : ""
       }`}
     >
-
       <span className="step-number">
-        {complete
-          ? "✓"
-          : number}
+        {complete ? "✓" : number}
       </span>
 
-      <span>
-        {label}
-      </span>
-
+      <span>{label}</span>
     </div>
   );
 }
@@ -1869,32 +1573,25 @@ function DeliveryToggle({
 }: DeliveryToggleProps) {
   return (
     <div className="delivery-toggle-row">
-
       <div className="toggle-description">
+        <strong>{title}</strong>
 
-        <strong>
-          {title}
-        </strong>
-
-        <p>
-          {description}
-        </p>
-
+        <p>{description}</p>
       </div>
 
       <label className="switch">
-<input
-  type="checkbox"
-  checked={Boolean(checked)}
-  onChange={(event) =>
-    onChange(event.target.checked)
-  }
-/>
+        <input
+          type="checkbox"
+          checked={Boolean(checked)}
+          onChange={(event) =>
+            onChange(
+              event.target.checked,
+            )
+          }
+        />
 
         <span className="slider" />
-
       </label>
-
     </div>
   );
 }
