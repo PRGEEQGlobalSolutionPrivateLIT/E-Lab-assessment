@@ -1,15 +1,29 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import {
   useParams,
   useRouter,
   useSearchParams,
 } from "next/navigation";
 
+import { API_URL } from "@/src/lib/api/fetcher";
+
 import "./coding-question.css";
 
-type TestCaseType = "SAMPLE" | "PUBLIC" | "HIDDEN";
+/* ============================================================
+   TYPES
+   ============================================================ */
+
+type TestCaseType =
+  | "SAMPLE"
+  | "PUBLIC"
+  | "HIDDEN";
 
 interface TestCase {
   id: string;
@@ -77,6 +91,10 @@ interface StoredQuestion {
   updatedAt: string;
 }
 
+/* ============================================================
+   DEFAULTS
+   ============================================================ */
+
 const DEFAULT_STARTER_CODE = `#include <stdio.h>
 
 int main() {
@@ -116,16 +134,20 @@ const DEFAULT_FORM: CodingQuestionForm = {
   aiPolicy: "DISABLED",
 };
 
+/* ============================================================
+   PAGE
+   ============================================================ */
+
 export default function CodingQuestionPage() {
   const router = useRouter();
+
   const params = useParams();
-  const searchParams = useSearchParams();
 
-  const assessmentId = params.assessmentId as string;
+  const searchParams =
+    useSearchParams();
 
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:3001";
+  const assessmentId =
+    params.assessmentId as string;
 
   const sectionId =
     searchParams.get("sectionId") || null;
@@ -144,12 +166,21 @@ export default function CodingQuestionPage() {
   const [testCases, setTestCases] =
     useState<TestCase[]>([
       {
-        id: crypto.randomUUID(),
-        name: "Sample Test",
-        type: "SAMPLE",
+        id:
+          crypto.randomUUID(),
+
+        name:
+          "Sample Test",
+
+        type:
+          "SAMPLE",
+
         input: "",
+
         expectedOutput: "",
+
         marks: 10,
+
         active: true,
       },
     ]);
@@ -157,17 +188,19 @@ export default function CodingQuestionPage() {
   const [errors, setErrors] =
     useState<string[]>([]);
 
-  // const [savedMessage, setSavedMessage] =
-  //   useState("");
-
   const [advancedOpen, setAdvancedOpen] =
     useState(false);
 
-  /*
-  ============================================================
-  EDIT MODE LOAD
-  ============================================================
-  */
+  const [loading, setLoading] =
+    useState(false);
+
+  /* ============================================================
+     EDIT MODE LOAD
+     
+     IMPORTANT:
+     Load the actual question from the backend.
+     Do not depend on sessionStorage.
+     ============================================================ */
 
   useEffect(() => {
     if (
@@ -177,58 +210,101 @@ export default function CodingQuestionPage() {
       return;
     }
 
-    const storedQuestions =
-      sessionStorage.getItem(
-        "questionBank",
-      );
+    async function loadQuestion() {
+      try {
+        setLoading(true);
 
-    if (!storedQuestions) {
-      return;
-    }
+        const response =
+          await fetch(
+            `${API_URL}/questions/${editingQuestionId}`,
+          );
 
-    try {
-      const parsed =
-        JSON.parse(
-          storedQuestions,
-        ) as StoredQuestion[];
+        if (!response.ok) {
+          throw new Error(
+            "Unable to load question.",
+          );
+        }
 
-      const existing =
-        parsed.find(
-          (question) =>
-            question.id ===
-            editingQuestionId,
+        const data =
+          await response.json();
+
+        console.log(
+          "Loaded coding question:",
+          data,
         );
 
-      if (!existing) {
-        return;
+        /*
+         * Support both:
+         *
+         * {
+         *   form: {...},
+         *   testCases: [...]
+         * }
+         *
+         * and a response where the fields
+         * are returned directly.
+         */
+
+        const loadedForm =
+          data.form ?? data;
+
+        setForm({
+          ...DEFAULT_FORM,
+          ...loadedForm,
+        });
+
+        if (
+          Array.isArray(
+            data.testCases,
+          )
+        ) {
+          setTestCases(
+            data.testCases,
+          );
+        }
+
+        if (
+          data.sectionId &&
+          !sectionId
+        ) {
+          console.log(
+            "Question section:",
+            data.sectionId,
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Unable to load coding question:",
+          error,
+        );
+
+        setErrors([
+          "Unable to load the coding question.",
+        ]);
+      } finally {
+        setLoading(false);
       }
-
-      setForm(existing.form);
-
-      setTestCases(
-        existing.testCases,
-      );
-    } catch {
-      console.error(
-        "Unable to load coding question.",
-      );
     }
+
+    loadQuestion();
   }, [
     mode,
     editingQuestionId,
+    sectionId,
   ]);
 
-  /*
-  ============================================================
-  CALCULATIONS
-  ============================================================
-  */
+  /* ============================================================
+     CALCULATIONS
+     ============================================================ */
 
   const testCaseMarks =
     useMemo(
       () =>
         testCases.reduce(
-          (total, test) =>
+          (
+            total,
+            test,
+          ) =>
             total +
             Number(
               test.marks || 0,
@@ -240,21 +316,19 @@ export default function CodingQuestionPage() {
 
   const activeTestCount =
     testCases.filter(
-      (test) => test.active,
+      (test) =>
+        test.active,
     ).length;
 
-  /*
-  ============================================================
-  FIELD UPDATE
-  ============================================================
-  */
+  /* ============================================================
+     FIELD UPDATE
+     ============================================================ */
 
   function updateField<
     K extends keyof CodingQuestionForm,
   >(
     field: K,
-    value:
-      CodingQuestionForm[K],
+    value: CodingQuestionForm[K],
   ) {
     setForm(
       (current) => ({
@@ -264,29 +338,33 @@ export default function CodingQuestionPage() {
     );
 
     setErrors([]);
-    // setSavedMessage("");
   }
 
-  /*
-  ============================================================
-  TEST CASE ACTIONS
-  ============================================================
-  */
+  /* ============================================================
+     TEST CASE ACTIONS
+     ============================================================ */
 
   function addTestCase() {
     setTestCases(
       (current) => [
         ...current,
+
         {
           id:
             crypto.randomUUID(),
-          name: `Test ${
-            current.length + 1
-          }`,
-          type: "HIDDEN",
+
+          name:
+            `Test ${current.length + 1}`,
+
+          type:
+            "HIDDEN",
+
           input: "",
+
           expectedOutput: "",
+
           marks: 0,
+
           active: true,
         },
       ],
@@ -327,6 +405,8 @@ export default function CodingQuestionPage() {
             test.id !== id,
         ),
     );
+
+    setErrors([]);
   }
 
   function duplicateTestCase(
@@ -345,28 +425,33 @@ export default function CodingQuestionPage() {
     setTestCases(
       (current) => [
         ...current,
+
         {
           ...original,
+
           id:
             crypto.randomUUID(),
+
           name:
             `${original.name} Copy`,
         },
       ],
     );
+
+    setErrors([]);
   }
 
-  /*
-  ============================================================
-  VALIDATION
-  ============================================================
-  */
+  /* ============================================================
+     VALIDATION
+     ============================================================ */
 
   function validateQuestion() {
     const validationErrors:
       string[] = [];
 
-    if (!form.title.trim()) {
+    if (
+      !form.title.trim()
+    ) {
       validationErrors.push(
         "Question title is required.",
       );
@@ -413,7 +498,10 @@ export default function CodingQuestionPage() {
     }
 
     testCases.forEach(
-      (test, index) => {
+      (
+        test,
+        index,
+      ) => {
         if (
           !test.expectedOutput.trim()
         ) {
@@ -421,6 +509,17 @@ export default function CodingQuestionPage() {
             `Test ${
               index + 1
             }: Expected output is required.`,
+          );
+        }
+
+        if (
+          Number(test.marks) <
+          0
+        ) {
+          validationErrors.push(
+            `Test ${
+              index + 1
+            }: Marks cannot be negative.`,
           );
         }
       },
@@ -445,156 +544,341 @@ export default function CodingQuestionPage() {
     );
   }
 
-  /*
-  ============================================================
-  SAVE DRAFT
-  ============================================================
-  */
+  /* ============================================================
+     BUILD PAYLOAD
+     ============================================================ */
 
-  // function saveDraft() {
-  //   const draft = {
-  //     assessmentId,
-  //     sectionId,
-  //     form,
-  //     testCases,
-  //     updatedAt:
-  //       new Date().toISOString(),
-  //   };
+  function buildPayload() {
+    return {
+      assessmentId,
 
-  //   sessionStorage.setItem(
-  //     `codingQuestionDraft:${assessmentId}`,
-  //     JSON.stringify(
-  //       draft,
-  //     ),
-  //   );
+      sectionId,
 
-  //   setSavedMessage(
-  //     "Draft saved",
-  //   );
-  // }
+      /*
+       * Keep these values for now because they are part of
+       * your current backend contract.
+       *
+       * Replace them later with authenticated user/context.
+       */
+      organizationId:
+        "DEFAULT_ORGANIZATION",
 
-  /*
-  ============================================================
-  SAVE QUESTION
-  ============================================================
-  */
+      createdByUserId:
+        "DEFAULT_USER",
+
+      form: {
+        title:
+          form.title,
+
+        code:
+          form.code,
+
+        difficulty:
+          form.difficulty,
+
+        marks:
+          form.marks,
+
+        problemStatement:
+          form.problemStatement,
+
+        inputFormat:
+          form.inputFormat,
+
+        outputFormat:
+          form.outputFormat,
+
+        constraints:
+          form.constraints,
+
+        exampleInput:
+          form.exampleInput,
+
+        exampleOutput:
+          form.exampleOutput,
+
+        language:
+          form.language,
+
+        starterCode:
+          form.starterCode,
+
+        referenceSolution:
+          form.referenceSolution,
+
+        bloomsLevel:
+          form.bloomsLevel,
+
+        skill:
+          form.skill,
+
+        subskill:
+          form.subskill,
+
+        compiler:
+          form.compiler,
+
+        languageStandard:
+          form.languageStandard,
+
+        timeLimitSeconds:
+          form.timeLimitSeconds,
+
+        memoryLimitMb:
+          form.memoryLimitMb,
+
+        aiPolicy:
+          form.aiPolicy,
+      },
+
+      testCases:
+        testCases.map(
+          (
+            test,
+            index,
+          ) => ({
+            id:
+              test.id,
+
+            name:
+              test.name,
+
+            type:
+              test.type,
+
+            input:
+              test.input,
+
+            expectedOutput:
+              test.expectedOutput,
+
+            marks:
+              Number(
+                test.marks,
+              ),
+
+            sequence:
+              index + 1,
+
+            active:
+              test.active,
+          }),
+        ),
+    };
+  }
+
+  /* ============================================================
+     PARSE BACKEND ERROR
+     ============================================================ */
+
+  async function getBackendError(
+    response: Response,
+  ) {
+    const errorText =
+      await response.text();
+
+    console.error(
+      "Question API Error:",
+      errorText,
+    );
+
+    let backendMessage =
+      "Question operation failed.";
+
+    if (
+      errorText.trim()
+    ) {
+      try {
+        const parsed =
+          JSON.parse(
+            errorText,
+          );
+
+        if (
+          Array.isArray(
+            parsed?.message,
+          )
+        ) {
+          backendMessage =
+            parsed.message.join(
+              "; ",
+            );
+        } else if (
+          parsed?.message
+        ) {
+          backendMessage =
+            parsed.message;
+        } else if (
+          parsed?.error
+        ) {
+          backendMessage =
+            parsed.error;
+        }
+      } catch {
+        backendMessage =
+          errorText;
+      }
+    }
+
+    return backendMessage;
+  }
+
+  /* ============================================================
+     SAVE / UPDATE QUESTION
+     ============================================================ */
 
   async function saveQuestion() {
-    if (!validateQuestion()) {
+    if (
+      !validateQuestion()
+    ) {
       return;
     }
 
-    const payload = {
-      assessmentId,
-      sectionId,
-      organizationId: "DEFAULT_ORGANIZATION",
-      createdByUserId: "DEFAULT_USER",
-
-      form: {
-        title: form.title,
-        code: form.code,
-        difficulty: form.difficulty,
-        marks: form.marks,
-        problemStatement: form.problemStatement,
-        inputFormat: form.inputFormat,
-        outputFormat: form.outputFormat,
-        constraints: form.constraints,
-        exampleInput: form.exampleInput,
-        exampleOutput: form.exampleOutput,
-        language: form.language,
-        starterCode: form.starterCode,
-        referenceSolution: form.referenceSolution,
-        bloomsLevel: form.bloomsLevel,
-        skill: form.skill,
-        subskill: form.subskill,
-        compiler: form.compiler,
-        languageStandard: form.languageStandard,
-        timeLimitSeconds: form.timeLimitSeconds,
-        memoryLimitMb: form.memoryLimitMb,
-        aiPolicy: form.aiPolicy,
-      },
-
-      testCases: testCases.map((test, index) => ({
-        name: test.name,
-        type: test.type,
-        input: test.input,
-        expectedOutput: test.expectedOutput,
-        marks: test.marks,
-        sequence: index + 1,
-        active: test.active,
-      })),
-    };
+    const payload =
+      buildPayload();
 
     try {
-      const response = await fetch(
-        `${API_URL}/questions/coding`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        },
-      );
+      setLoading(true);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Question API Error:", errorText);
+      /*
+       * CREATE
+       */
 
-        let backendMessage = "Question creation failed";
+      if (
+        mode !== "edit" ||
+        !editingQuestionId
+      ) {
+        const response =
+          await fetch(
+            `${API_URL}/questions/coding`,
+            {
+              method:
+                "POST",
 
-        try {
-          const parsed = JSON.parse(errorText);
-          backendMessage =
-            Array.isArray(parsed?.message)
-              ? parsed.message.join("; ")
-              : parsed?.message || backendMessage;
-        } catch {
-          if (errorText.trim()) {
-            backendMessage = errorText;
-          }
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify(
+                  payload,
+                ),
+            },
+          );
+
+        if (!response.ok) {
+          const message =
+            await getBackendError(
+              response,
+            );
+
+          throw new Error(
+            message,
+          );
         }
 
-        throw new Error(backendMessage);
+        const result =
+          await response.json();
+
+        console.log(
+          "Coding Question Created:",
+          result,
+        );
+
+        router.push(
+          `/assessments/${assessmentId}/questions`,
+        );
+
+        return;
       }
 
-      const result = await response.json();
+      /*
+       * UPDATE
+       *
+       * If your NestJS controller uses PATCH instead
+       * of PUT, change only the method below.
+       */
 
-      console.log("Coding Question Created:", result);
+      const response =
+        await fetch(
+          `${API_URL}/questions/coding/${editingQuestionId}`,
+          {
+            method:
+              "PUT",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify(
+                payload,
+              ),
+          },
+        );
+
+      if (!response.ok) {
+        const message =
+          await getBackendError(
+            response,
+          );
+
+        throw new Error(
+          message,
+        );
+      }
+
+      const result =
+        await response.json();
+
+      console.log(
+        "Coding Question Updated:",
+        result,
+      );
 
       router.push(
         `/assessments/${assessmentId}/questions`,
       );
-
-    } catch (error: any) {
-      console.error("SAVE QUESTION ERROR:", error);
+    } catch (error) {
+      console.error(
+        "SAVE QUESTION ERROR:",
+        error,
+      );
 
       const message =
-        error?.message ||
-        "Unable to connect to the assessment API.";
+        error instanceof Error
+          ? error.message
+          : "Unable to connect to the assessment API.";
 
-      if (message === "Failed to fetch") {
+      if (
+        message ===
+        "Failed to fetch"
+      ) {
         alert(
           `Unable to connect to the API server at ${API_URL}.\n\n` +
-          "Make sure the NestJS API is running and CORS is enabled."
+            "Make sure the NestJS API is running and CORS is enabled.",
         );
       } else {
         alert(message);
       }
+    } finally {
+      setLoading(false);
     }
   }
 
-  /*
-  ============================================================
-  UI
-  ============================================================
-  */
+  /* ============================================================
+     UI
+     ============================================================ */
 
   return (
     <main className="coding-question-page">
       <div className="coding-question-container">
 
-        {/* HEADER */}
+        {/* ======================================================
+            HEADER
+        ====================================================== */}
 
         <header className="coding-header">
           <div>
@@ -615,25 +899,30 @@ export default function CodingQuestionPage() {
             </span>
 
             <h1>
-              {mode === "edit"
+              {mode ===
+              "edit"
                 ? "Edit Coding Question"
                 : "Create Coding Question"}
             </h1>
 
             <p>
-              Define the problem, code
-              configuration and test cases.
+              Define the problem,
+              code configuration
+              and test cases.
             </p>
           </div>
 
           <span className="question-status">
-            Draft
+            {mode ===
+            "edit"
+              ? "EDITING"
+              : "DRAFT"}
           </span>
         </header>
 
-        {/* ====================================================
+        {/* ======================================================
             1. QUESTION
-        ==================================================== */}
+        ====================================================== */}
 
         <section className="authoring-card">
           <div className="section-heading">
@@ -647,7 +936,9 @@ export default function CodingQuestionPage() {
               </h2>
 
               <p>
-                Core question details and problem statement.
+                Core question
+                details and
+                problem statement.
               </p>
             </div>
           </div>
@@ -664,10 +955,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.title
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "title",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
                 placeholder="Example: Find Maximum in an Array"
@@ -684,10 +978,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.code
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "code",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
                 placeholder="Auto or manual"
@@ -703,10 +1000,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.difficulty
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "difficulty",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
               >
@@ -735,13 +1035,16 @@ export default function CodingQuestionPage() {
                 value={
                   form.marks
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "marks",
                     Math.max(
                       1,
                       Number(
-                        event.target.value,
+                        event.target
+                          .value,
                       ),
                     ),
                   )
@@ -759,10 +1062,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.problemStatement
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "problemStatement",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
                 placeholder="Describe the programming problem clearly."
@@ -772,9 +1078,9 @@ export default function CodingQuestionPage() {
           </div>
         </section>
 
-        {/* ====================================================
+        {/* ======================================================
             2. INPUT / OUTPUT
-        ==================================================== */}
+        ====================================================== */}
 
         <section className="authoring-card">
           <div className="section-heading">
@@ -788,7 +1094,10 @@ export default function CodingQuestionPage() {
               </h2>
 
               <p>
-                Define how the learner should read input and produce output.
+                Define how the
+                learner should
+                read input and
+                produce output.
               </p>
             </div>
           </div>
@@ -805,10 +1114,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.inputFormat
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "inputFormat",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
                 placeholder="Example: First line contains integer N..."
@@ -825,10 +1137,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.outputFormat
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "outputFormat",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
                 placeholder="Example: Print the maximum value."
@@ -845,10 +1160,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.constraints
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "constraints",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
                 placeholder="Example: 1 ≤ N ≤ 1000"
@@ -866,10 +1184,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.exampleInput
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "exampleInput",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
               />
@@ -886,10 +1207,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.exampleOutput
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "exampleOutput",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
               />
@@ -898,9 +1222,9 @@ export default function CodingQuestionPage() {
           </div>
         </section>
 
-        {/* ====================================================
+        {/* ======================================================
             3. CODE & TEST CASES
-        ==================================================== */}
+        ====================================================== */}
 
         <section className="authoring-card">
           <div className="section-heading">
@@ -914,7 +1238,10 @@ export default function CodingQuestionPage() {
               </h2>
 
               <p>
-                Configure language, starter code and automated validation.
+                Configure language,
+                starter code and
+                automated
+                validation.
               </p>
             </div>
           </div>
@@ -930,15 +1257,42 @@ export default function CodingQuestionPage() {
                 value={
                   form.language
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "language",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
               >
                 <option value="C">
                   C
+                </option>
+
+                <option value="C++">
+                  C++
+                </option>
+
+                <option value="Java">
+                  Java
+                </option>
+
+                <option value="Python">
+                  Python
+                </option>
+
+                <option value="JavaScript">
+                  JavaScript
+                </option>
+
+                <option value="C#">
+                  C#
+                </option>
+
+                <option value="Go">
+                  Go
                 </option>
               </select>
             </label>
@@ -952,7 +1306,15 @@ export default function CodingQuestionPage() {
                 value={
                   form.compiler
                 }
-                disabled
+                onChange={(
+                  event,
+                ) =>
+                  updateField(
+                    "compiler",
+                    event.target
+                      .value,
+                  )
+                }
               />
             </label>
 
@@ -971,10 +1333,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.starterCode
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "starterCode",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
               />
@@ -991,10 +1356,13 @@ export default function CodingQuestionPage() {
                 value={
                   form.referenceSolution
                 }
-                onChange={(event) =>
+                onChange={(
+                  event,
+                ) =>
                   updateField(
                     "referenceSolution",
-                    event.target.value,
+                    event.target
+                      .value,
                   )
                 }
                 placeholder="Add the verified reference solution."
@@ -1012,7 +1380,8 @@ export default function CodingQuestionPage() {
               </h3>
 
               <p>
-                {activeTestCount} active •{" "}
+                {activeTestCount}{" "}
+                active •{" "}
                 {testCaseMarks} /{" "}
                 {form.marks} marks
               </p>
@@ -1032,7 +1401,10 @@ export default function CodingQuestionPage() {
           <div className="test-case-list">
 
             {testCases.map(
-              (test, index) => (
+              (
+                test,
+                index,
+              ) => (
 
                 <div
                   key={
@@ -1059,11 +1431,14 @@ export default function CodingQuestionPage() {
                         value={
                           test.name
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event,
+                        ) =>
                           updateTestCase(
                             test.id,
                             "name",
-                            event.target.value,
+                            event.target
+                              .value,
                           )
                         }
                       />
@@ -1111,7 +1486,9 @@ export default function CodingQuestionPage() {
                         value={
                           test.type
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event,
+                        ) =>
                           updateTestCase(
                             test.id,
                             "type",
@@ -1145,14 +1522,17 @@ export default function CodingQuestionPage() {
                         value={
                           test.marks
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event,
+                        ) =>
                           updateTestCase(
                             test.id,
                             "marks",
                             Math.max(
                               0,
                               Number(
-                                event.target.value,
+                                event.target
+                                  .value,
                               ),
                             ),
                           )
@@ -1170,11 +1550,14 @@ export default function CodingQuestionPage() {
                         checked={
                           test.active
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event,
+                        ) =>
                           updateTestCase(
                             test.id,
                             "active",
-                            event.target.checked,
+                            event.target
+                              .checked,
                           )
                         }
                       />
@@ -1191,11 +1574,14 @@ export default function CodingQuestionPage() {
                         value={
                           test.input
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event,
+                        ) =>
                           updateTestCase(
                             test.id,
                             "input",
-                            event.target.value,
+                            event.target
+                              .value,
                           )
                         }
                       />
@@ -1212,29 +1598,29 @@ export default function CodingQuestionPage() {
                         value={
                           test.expectedOutput
                         }
-                        onChange={(event) =>
+                        onChange={(
+                          event,
+                        ) =>
                           updateTestCase(
                             test.id,
                             "expectedOutput",
-                            event.target.value,
+                            event.target
+                              .value,
                           )
                         }
                       />
                     </label>
 
                   </div>
-
                 </div>
-
               ),
             )}
-
           </div>
         </section>
 
-        {/* ====================================================
+        {/* ======================================================
             4. ADVANCED SETTINGS
-        ==================================================== */}
+        ====================================================== */}
 
         <section className="authoring-card advanced-card">
 
@@ -1259,7 +1645,9 @@ export default function CodingQuestionPage() {
                 </strong>
 
                 <small>
-                  Skills, Bloom's level, runtime limits and AI policy
+                  Skills, Bloom's level,
+                  runtime limits and
+                  AI policy
                 </small>
               </div>
             </div>
@@ -1272,7 +1660,6 @@ export default function CodingQuestionPage() {
           </button>
 
           {advancedOpen && (
-
             <div className="advanced-content">
 
               <div className="form-grid two-columns">
@@ -1286,10 +1673,13 @@ export default function CodingQuestionPage() {
                     value={
                       form.bloomsLevel
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event,
+                    ) =>
                       updateField(
                         "bloomsLevel",
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                   >
@@ -1328,10 +1718,13 @@ export default function CodingQuestionPage() {
                     value={
                       form.skill
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event,
+                    ) =>
                       updateField(
                         "skill",
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                     placeholder="Example: C Programming"
@@ -1347,10 +1740,13 @@ export default function CodingQuestionPage() {
                     value={
                       form.subskill
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event,
+                    ) =>
                       updateField(
                         "subskill",
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                     placeholder="Example: Arrays"
@@ -1366,10 +1762,13 @@ export default function CodingQuestionPage() {
                     value={
                       form.languageStandard
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event,
+                    ) =>
                       updateField(
                         "languageStandard",
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                   >
@@ -1383,6 +1782,10 @@ export default function CodingQuestionPage() {
 
                     <option value="C99">
                       C99
+                    </option>
+
+                    <option value="C23">
+                      C23
                     </option>
                   </select>
                 </label>
@@ -1399,13 +1802,16 @@ export default function CodingQuestionPage() {
                       value={
                         form.timeLimitSeconds
                       }
-                      onChange={(event) =>
+                      onChange={(
+                        event,
+                      ) =>
                         updateField(
                           "timeLimitSeconds",
                           Math.max(
                             1,
                             Number(
-                              event.target.value,
+                              event.target
+                                .value,
                             ),
                           ),
                         )
@@ -1430,13 +1836,16 @@ export default function CodingQuestionPage() {
                       value={
                         form.memoryLimitMb
                       }
-                      onChange={(event) =>
+                      onChange={(
+                        event,
+                      ) =>
                         updateField(
                           "memoryLimitMb",
                           Math.max(
                             64,
                             Number(
-                              event.target.value,
+                              event.target
+                                .value,
                             ),
                           ),
                         )
@@ -1458,10 +1867,13 @@ export default function CodingQuestionPage() {
                     value={
                       form.aiPolicy
                     }
-                    onChange={(event) =>
+                    onChange={(
+                      event,
+                    ) =>
                       updateField(
                         "aiPolicy",
-                        event.target.value,
+                        event.target
+                          .value,
                       )
                     }
                   >
@@ -1473,7 +1885,7 @@ export default function CodingQuestionPage() {
                       Hints Only
                     </option>
 
-                    <option value="DEBUG_SUPPORT">
+                    <option value="DEBUG_ASSISTANCE">
                       Debug Support
                     </option>
 
@@ -1484,30 +1896,31 @@ export default function CodingQuestionPage() {
                 </label>
 
               </div>
-
             </div>
-
           )}
-
         </section>
 
-        {/* ERRORS */}
+        {/* ======================================================
+            ERRORS
+        ====================================================== */}
 
-        {errors.length > 0 && (
-
+        {errors.length >
+          0 && (
           <div className="error-panel">
 
             <strong>
-              Please correct the following:
+              Please correct the
+              following:
             </strong>
 
             <ul>
               {errors.map(
-                (error, index) => (
+                (
+                  error,
+                  index,
+                ) => (
                   <li
-                    key={
-                      `${error}-${index}`
-                    }
+                    key={`${error}-${index}`}
                   >
                     {error}
                   </li>
@@ -1516,48 +1929,52 @@ export default function CodingQuestionPage() {
             </ul>
 
           </div>
-
         )}
 
-        {/* FOOTER */}
+        {/* ======================================================
+            FOOTER
+        ====================================================== */}
 
-       <footer className="coding-footer">
+        <footer className="coding-footer">
 
-  <button
-    type="button"
-    className="secondary-button"
-    onClick={() =>
-      router.push(
-        `/assessments/${assessmentId}/questions`,
-      )
-    }
-  >
-    Cancel
-  </button>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={
+              loading
+            }
+            onClick={() =>
+              router.push(
+                `/assessments/${assessmentId}/questions`,
+              )
+            }
+          >
+            Cancel
+          </button>
 
+          <div className="footer-actions">
 
-  <div className="footer-actions">
+            <button
+              type="button"
+              className="primary-button"
+              disabled={
+                loading
+              }
+              onClick={
+                saveQuestion
+              }
+            >
+              {loading
+                ? "Saving..."
+                : mode ===
+                    "edit"
+                  ? "Update Question"
+                  : "Save Question"}
+            </button>
 
+          </div>
 
-    <button
-      type="button"
-      className="primary-button"
-      onClick={
-        saveQuestion
-      }
-    >
-
-      {mode === "edit"
-        ? "Update Question"
-        : "Save Question"}
-
-    </button>
-
-
-  </div>
-
-
-</footer>
+        </footer>
 
       </div>
     </main>
