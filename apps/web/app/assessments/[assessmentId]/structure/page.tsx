@@ -1,173 +1,541 @@
-// Updated Step 2 Assessment Structure page
-// This file keeps backend unchanged.
-// API payload matches AssessmentSection table:
-// assessmentId, title, description, totalMarks, durationMinutes, sequence
-
 "use client";
 
-import { useRouter, useParams } from "next/navigation";
-import { useState } from "react";
+import {
+  useRouter,
+  useParams,
+} from "next/navigation";
+
+import {
+  useState,
+} from "react";
+
+import {
+  API_URL,
+} from "@/src/lib/api/fetcher";
+
 import "./structure.css";
 
-export default function AssessmentStructurePage(){
+/* ============================================================
+   TYPES
+   ============================================================ */
 
+interface AssessmentSection {
+  name: string;
+  description: string;
+  marks: number;
+  timeLimitMinutes: number;
+}
+
+/* ============================================================
+   PAGE
+   ============================================================ */
+
+export default function AssessmentStructurePage() {
   const router = useRouter();
   const params = useParams();
 
-  const assessmentId = params.assessmentId as string;
+  const assessmentId =
+    params.assessmentId as string;
 
-  const [section,setSection] = useState({
-    name:"",
-    description:"",
-    marks:0,
-    timeLimitMinutes:0
-  });
+  /* ============================================================
+     STATE
+     ============================================================ */
 
-  async function saveAndContinue(){
+  const [section, setSection] =
+    useState<AssessmentSection>({
+      name: "",
+      description: "",
+      marks: 0,
+      timeLimitMinutes: 0,
+    });
 
-    const response = await fetch(
-      "http://localhost:3001/assessment-sections",
-      {
-        method:"POST",
-        headers:{
-          "Content-Type":"application/json"
-        },
-        body:JSON.stringify({
-          assessmentId,
+  const [errors, setErrors] =
+    useState<string[]>([]);
 
-          title:section.name,
+  const [saving, setSaving] =
+    useState(false);
 
-          description:
-            section.description,
+  /* ============================================================
+     UPDATE FIELD
+     ============================================================ */
 
-          totalMarks:
-            section.marks,
-
-          durationMinutes:
-            section.timeLimitMinutes,
-
-          sequence:1
-        })
-      }
+  function updateSection<
+    K extends keyof AssessmentSection,
+  >(
+    field: K,
+    value: AssessmentSection[K],
+  ) {
+    setSection(
+      (current) => ({
+        ...current,
+        [field]: value,
+      }),
     );
 
-    if(!response.ok){
-      throw new Error("Section save failed");
+    setErrors([]);
+  }
+
+  /* ============================================================
+     VALIDATION
+     ============================================================ */
+
+  function validateSection() {
+    const validationErrors: string[] =
+      [];
+
+    if (!assessmentId) {
+      validationErrors.push(
+        "Assessment ID is missing.",
+      );
     }
 
-    router.push(
-      `/assessments/${assessmentId}/questions`
+    if (!section.name.trim()) {
+      validationErrors.push(
+        "Section name is required.",
+      );
+    }
+
+    if (
+      section.marks <= 0
+    ) {
+      validationErrors.push(
+        "Total marks must be greater than zero.",
+      );
+    }
+
+    if (
+      section.timeLimitMinutes <=
+      0
+    ) {
+      validationErrors.push(
+        "Duration must be greater than zero minutes.",
+      );
+    }
+
+    setErrors(
+      validationErrors,
+    );
+
+    return (
+      validationErrors.length ===
+      0
     );
   }
 
+  /* ============================================================
+     SAVE SECTION
+     ============================================================ */
+
+  async function saveSection() {
+    /*
+     * Backend payload intentionally remains:
+     *
+     * assessmentId
+     * title
+     * description
+     * totalMarks
+     * durationMinutes
+     * sequence
+     */
+
+    const payload = {
+      assessmentId,
+
+      title:
+        section.name.trim(),
+
+      description:
+        section.description.trim(),
+
+      totalMarks:
+        Number(section.marks),
+
+      durationMinutes:
+        Number(
+          section.timeLimitMinutes,
+        ),
+
+      sequence: 1,
+    };
+
+    try {
+      setSaving(true);
+
+      console.log(
+        "SAVING ASSESSMENT SECTION:",
+        payload,
+      );
+
+      const response =
+        await fetch(
+          `${API_URL}/assessment-sections`,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body:
+              JSON.stringify(
+                payload,
+              ),
+          },
+        );
+
+      if (!response.ok) {
+        const responseText =
+          await response.text();
+
+        let errorMessage =
+          "Section save failed.";
+
+        /*
+         * Handle NestJS-style:
+         *
+         * {
+         *   "message": "..."
+         * }
+         *
+         * or:
+         *
+         * {
+         *   "message": ["...", "..."]
+         * }
+         */
+
+        try {
+          const errorData =
+            responseText
+              ? JSON.parse(
+                  responseText,
+                )
+              : null;
+
+          if (
+            Array.isArray(
+              errorData?.message,
+            )
+          ) {
+            errorMessage =
+              errorData.message.join(
+                "; ",
+              );
+          } else if (
+            errorData?.message
+          ) {
+            errorMessage =
+              errorData.message;
+          } else if (
+            responseText.trim()
+          ) {
+            errorMessage =
+              responseText;
+          }
+        } catch {
+          if (
+            responseText.trim()
+          ) {
+            errorMessage =
+              responseText;
+          }
+        }
+
+        throw new Error(
+          errorMessage,
+        );
+      }
+
+      console.log(
+        "Assessment section saved successfully.",
+      );
+
+      return true;
+    } catch (error) {
+      console.error(
+        "Assessment section save failed:",
+        error,
+      );
+
+      setErrors([
+        error instanceof Error
+          ? error.message
+          : "Unable to save assessment section.",
+      ]);
+
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /* ============================================================
+     SAVE & CONTINUE
+     ============================================================ */
+
+  async function saveAndContinue() {
+    if (!validateSection()) {
+      return;
+    }
+
+    const saved =
+      await saveSection();
+
+    if (!saved) {
+      return;
+    }
+
+    router.push(
+      `/assessments/${assessmentId}/questions`,
+    );
+  }
+
+  /* ============================================================
+     BACK TO SETUP
+     ============================================================ */
+
+  function goBackToSetup() {
+    if (saving) {
+      return;
+    }
+
+    router.push(
+      `/assessments/${assessmentId}/edit`,
+    );
+  }
+
+  /* ============================================================
+     UI
+     ============================================================ */
 
   return (
     <main className="structure-page">
-
       <div className="structure-card">
 
+        {/* ====================================================
+            BACK LINK
+        ==================================================== */}
+
         <button
+          type="button"
           className="back-link"
-          onClick={() =>
-            router.push(
-              `/assessments/${assessmentId}/edit`
-            )
+          disabled={saving}
+          onClick={
+            goBackToSetup
           }
         >
           ← Back to Assessment Setup
         </button>
 
+        {/* ====================================================
+            HEADER
+        ==================================================== */}
 
-        <h1>
-          Assessment Structure
-        </h1>
+        <div className="structure-header">
+          <span className="step-caption">
+            STEP 2 OF 6
+          </span>
 
+          <h1>
+            Assessment Structure
+          </h1>
+
+          <p>
+            Configure the assessment
+            section before adding
+            questions.
+          </p>
+        </div>
+
+        {/* ====================================================
+            FORM
+        ==================================================== */}
 
         <div className="form-section">
 
-          <label>Section Name</label>
+          {/* ==================================================
+              SECTION NAME
+          ================================================== */}
+
+          <label
+            htmlFor="section-name"
+          >
+            Section Name
+          </label>
 
           <input
-            value={section.name}
-            onChange={(e)=>
-              setSection({
-                ...section,
-                name:e.target.value
-              })
+            id="section-name"
+            type="text"
+            value={
+              section.name
+            }
+            placeholder="e.g. Programming Fundamentals"
+            disabled={saving}
+            onChange={(event) =>
+              updateSection(
+                "name",
+                event.target.value,
+              )
             }
           />
 
+          {/* ==================================================
+              DESCRIPTION
+          ================================================== */}
 
-          <label>Description</label>
+          <label
+            htmlFor="section-description"
+          >
+            Description
+          </label>
 
           <textarea
-            value={section.description}
-            onChange={(e)=>
-              setSection({
-                ...section,
-                description:e.target.value
-              })
+            id="section-description"
+            value={
+              section.description
+            }
+            placeholder="Describe what this section covers..."
+            rows={4}
+            disabled={saving}
+            onChange={(event) =>
+              updateSection(
+                "description",
+                event.target.value,
+              )
             }
           />
 
+          {/* ==================================================
+              TOTAL MARKS
+          ================================================== */}
 
-          <label>Total Marks</label>
+          <label
+            htmlFor="section-marks"
+          >
+            Total Marks
+          </label>
 
           <input
+            id="section-marks"
             type="number"
-            value={section.marks}
-            onChange={(e)=>
-              setSection({
-                ...section,
-                marks:Number(e.target.value)
-              })
+            min={1}
+            step={1}
+            value={
+              section.marks
+            }
+            disabled={saving}
+            onChange={(event) =>
+              updateSection(
+                "marks",
+                Math.max(
+                  0,
+                  Number(
+                    event.target.value,
+                  ),
+                ),
+              )
             }
           />
 
+          {/* ==================================================
+              DURATION
+          ================================================== */}
 
-          <label>Duration Minutes</label>
+          <label
+            htmlFor="section-duration"
+          >
+            Duration Minutes
+          </label>
 
           <input
+            id="section-duration"
             type="number"
-            value={section.timeLimitMinutes}
-            onChange={(e)=>
-              setSection({
-                ...section,
-                timeLimitMinutes:Number(e.target.value)
-              })
+            min={1}
+            step={1}
+            value={
+              section.timeLimitMinutes
+            }
+            disabled={saving}
+            onChange={(event) =>
+              updateSection(
+                "timeLimitMinutes",
+                Math.max(
+                  0,
+                  Number(
+                    event.target.value,
+                  ),
+                ),
+              )
             }
           />
-
 
         </div>
 
+        {/* ====================================================
+            VALIDATION
+        ==================================================== */}
+
+        {errors.length > 0 && (
+          <section className="validation-panel">
+
+            <strong>
+              Complete the section
+              configuration before
+              continuing.
+            </strong>
+
+            <ul>
+              {errors.map(
+                (
+                  error,
+                  index,
+                ) => (
+                  <li
+                    key={`${error}-${index}`}
+                  >
+                    {error}
+                  </li>
+                ),
+              )}
+            </ul>
+
+          </section>
+        )}
+
+        {/* ====================================================
+            FOOTER
+        ==================================================== */}
 
         <div className="footer-actions">
 
           <button
+            type="button"
             className="secondary-button"
-            onClick={() =>
-              router.push(
-                `/assessments/${assessmentId}/edit`
-              )
+            disabled={saving}
+            onClick={
+              goBackToSetup
             }
           >
             ← Back
           </button>
 
-
           <button
+            type="button"
             className="primary-button"
-            onClick={saveAndContinue}
+            disabled={saving}
+            onClick={
+              saveAndContinue
+            }
           >
-            Save & Continue →
+            {saving
+              ? "Saving..."
+              : "Save & Continue →"}
           </button>
 
         </div>
 
-
       </div>
-
     </main>
   );
 }
