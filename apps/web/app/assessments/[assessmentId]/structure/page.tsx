@@ -9,9 +9,7 @@ import {
   useState,
 } from "react";
 
-import {
-  API_URL,
-} from "@/src/lib/api/fetcher";
+import { API_URL } from "@/lib/api/fetcher";
 
 import "./structure.css";
 
