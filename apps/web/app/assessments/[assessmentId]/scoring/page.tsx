@@ -379,8 +379,8 @@ export default function ScoringRulesPage() {
               )
               .sort(
                 (
-                  a,
-                  b,
+                  a: AssessmentQuestion,
+                  b: AssessmentQuestion,
                 ) =>
                   Number(
                     a.sequence,
