@@ -11,15 +11,23 @@ import {
   useRouter,
 } from "next/navigation";
 
+import { API_URL } from "@/src/lib/api/fetcher";
+
+/* ============================================================
+   TYPES
+   ============================================================ */
 
 interface Assessment {
   id: string;
+
   title: string;
+
   code: string;
+
   totalMarks: number;
+
   durationMinutes: number;
 }
-
 
 interface LearnerResult {
   attemptId: string;
@@ -47,42 +55,35 @@ interface LearnerResult {
   timeTakenSeconds?: number | null;
 }
 
+/* ============================================================
+   PAGE
+   ============================================================ */
 
 export default function AssessmentResultsPage() {
-
   const params = useParams();
 
   const router = useRouter();
 
-
   const assessmentId =
     String(
-      params.assessmentId
+      params.assessmentId,
     );
-
-
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL ||
-    "http://localhost:3001";
-
 
   const [
     assessment,
     setAssessment,
   ] =
     useState<Assessment | null>(
-      null
+      null,
     );
-
 
   const [
     results,
     setResults,
   ] =
     useState<LearnerResult[]>(
-      []
+      [],
     );
-
 
   const [
     loading,
@@ -90,13 +91,11 @@ export default function AssessmentResultsPage() {
   ] =
     useState(true);
 
-
   const [
     error,
     setError,
   ] =
     useState("");
-
 
   const [
     search,
@@ -104,258 +103,330 @@ export default function AssessmentResultsPage() {
   ] =
     useState("");
 
-
   const [
     statusFilter,
     setStatusFilter,
   ] =
     useState("ALL");
 
+  /* ============================================================
+     LOAD DATA
+     ============================================================ */
 
   useEffect(() => {
-
     if (!assessmentId) {
       return;
     }
 
     loadResults();
-
-  }, [assessmentId]);
-
+  }, [
+    assessmentId,
+  ]);
 
   async function loadResults() {
-
     try {
-
       setLoading(true);
 
       setError("");
 
-
-      /*
-      =====================================================
-      LOAD ASSESSMENT
-      =====================================================
-      */
+      /* ========================================================
+         LOAD ASSESSMENT
+         ======================================================== */
 
       const assessmentResponse =
         await fetch(
           `${API_URL}/assessment/${assessmentId}`,
           {
-            cache: "no-store",
-          }
-        );
+            method: "GET",
 
+            cache: "no-store",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+          },
+        );
 
       if (
         !assessmentResponse.ok
       ) {
+        const text =
+          await assessmentResponse.text();
+
+        let message =
+          "Unable to load assessment.";
+
+        if (
+          text.trim()
+        ) {
+          try {
+            const parsed =
+              JSON.parse(text);
+
+            if (
+              Array.isArray(
+                parsed?.message,
+              )
+            ) {
+              message =
+                parsed.message.join(
+                  "; ",
+                );
+            } else if (
+              parsed?.message
+            ) {
+              message =
+                parsed.message;
+            } else {
+              message =
+                text;
+            }
+          } catch {
+            message =
+              text;
+          }
+        }
 
         throw new Error(
-          "Unable to load assessment."
+          message,
         );
-
       }
-
 
       const assessmentData =
         await assessmentResponse.json();
 
-
       setAssessment({
+        id: String(
+          assessmentData.id ??
+            assessmentId,
+        ),
 
-        id:
-          String(
-            assessmentData.id ??
-            assessmentId
-          ),
+        title: String(
+          assessmentData.title ??
+            "Assessment",
+        ),
 
-        title:
-          String(
-            assessmentData.title ??
-            "Assessment"
-          ),
+        code: String(
+          assessmentData.code ??
+            "-",
+        ),
 
-        code:
-          String(
-            assessmentData.code ??
-            "-"
-          ),
-
-        totalMarks:
-          Number(
-            assessmentData.totalMarks ??
-            0
-          ),
+        totalMarks: Number(
+          assessmentData.totalMarks ??
+            0,
+        ),
 
         durationMinutes:
           Number(
             assessmentData.durationMinutes ??
-            0
+              0,
           ),
-
       });
 
-
-      /*
-      =====================================================
-      LOAD ALL RESULTS
-      =====================================================
-      */
+      /* ========================================================
+         LOAD ALL RESULTS
+         ======================================================== */
 
       const resultResponse =
         await fetch(
           `${API_URL}/assessment/${assessmentId}/results`,
           {
-            cache: "no-store",
-          }
-        );
+            method: "GET",
 
+            cache: "no-store",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+          },
+        );
 
       if (
         !resultResponse.ok
       ) {
-
         const text =
           await resultResponse.text();
 
+        let message =
+          "Unable to load assessment results.";
+
+        if (
+          text.trim()
+        ) {
+          try {
+            const parsed =
+              JSON.parse(text);
+
+            if (
+              Array.isArray(
+                parsed?.message,
+              )
+            ) {
+              message =
+                parsed.message.join(
+                  "; ",
+                );
+            } else if (
+              parsed?.message
+            ) {
+              message =
+                parsed.message;
+            } else {
+              message =
+                text;
+            }
+          } catch {
+            message =
+              text;
+          }
+        }
+
         throw new Error(
-          text ||
-          "Unable to load assessment results."
+          message,
         );
-
       }
-
 
       const resultData =
         await resultResponse.json();
 
+      console.log(
+        "Assessment Results:",
+        resultData,
+      );
 
-      /*
-      =====================================================
-      SUPPORT MULTIPLE RESPONSE SHAPES
+      /* ========================================================
+         SUPPORT MULTIPLE RESPONSE SHAPES
 
-      []
+         []
 
-      OR
+         OR
 
-      {
-        data: []
-      }
+         {
+           data: []
+         }
 
-      OR
+         OR
 
-      {
-        results: []
-      }
-      =====================================================
-      */
+         {
+           results: []
+         }
+         ======================================================== */
 
       const rawResults =
-        Array.isArray(resultData)
+        Array.isArray(
+          resultData,
+        )
           ? resultData
           : Array.isArray(
-              resultData?.data
+              resultData?.data,
             )
-            ? resultData.data
-            : Array.isArray(
-                resultData?.results
-              )
-              ? resultData.results
-              : [];
+          ? resultData.data
+          : Array.isArray(
+              resultData?.results,
+            )
+          ? resultData.results
+          : [];
 
+      /* ========================================================
+         NORMALIZE RESULTS
+         ======================================================== */
 
       const normalizedResults =
         rawResults.map(
           (
             item: any,
-            index: number
+            index: number,
           ): LearnerResult => {
-
             const score =
               Number(
-                item.score ??
-                item.obtainedMarks ??
-                item.marksObtained ??
-                0
+                item?.score ??
+                  item?.obtainedMarks ??
+                  item?.marksObtained ??
+                  item?.totalScore ??
+                  0,
               );
-
 
             const totalMarks =
               Number(
-                item.totalMarks ??
-                assessmentData.totalMarks ??
-                0
+                item?.totalMarks ??
+                  assessmentData.totalMarks ??
+                  0,
               );
-
 
             let percentage =
               Number(
-                item.percentage ??
-                item.scorePercentage ??
-                0
+                item?.percentage ??
+                  item?.scorePercentage ??
+                  0,
               );
 
+            /*
+             * Calculate percentage when
+             * backend does not provide it.
+             */
 
             if (
-              percentage === 0 &&
+              (!Number.isFinite(
+                percentage,
+              ) ||
+                percentage === 0) &&
               totalMarks > 0 &&
               score >= 0
             ) {
-
               percentage =
                 (score /
                   totalMarks) *
                 100;
-
             }
 
-
             return {
-
               attemptId:
                 String(
-                  item.attemptId ??
-                  item.id ??
-                  `attempt-${index}`
+                  item?.attemptId ??
+                    item?.id ??
+                    `attempt-${index}`,
                 ),
 
               learnerId:
-                item.learnerId
+                item?.learnerId
                   ? String(
-                      item.learnerId
+                      item.learnerId,
                     )
                   : undefined,
 
               learnerName:
                 String(
-                  item.learnerName ??
-                  item.name ??
-                  item.userName ??
-                  item.studentName ??
-                  "Unknown Learner"
+                  item?.learnerName ??
+                    item?.name ??
+                    item?.userName ??
+                    item?.studentName ??
+                    item?.learner?.name ??
+                    "Unknown Learner",
                 ),
 
               email:
                 String(
-                  item.email ??
-                  item.learnerEmail ??
-                  item.studentEmail ??
-                  "-"
+                  item?.email ??
+                    item?.learnerEmail ??
+                    item?.studentEmail ??
+                    item?.learner?.email ??
+                    "-",
                 ),
 
               attemptNumber:
                 Number(
-                  item.attemptNumber ??
-                  item.attemptNo ??
-                  item.attempt ??
-                  index + 1
+                  item?.attemptNumber ??
+                    item?.attemptNo ??
+                    item?.attempt ??
+                    index + 1,
                 ),
 
               status:
                 String(
-                  item.status ??
-                  "UNKNOWN"
+                  item?.status ??
+                    "UNKNOWN",
                 ).toUpperCase(),
 
               score,
@@ -363,96 +434,91 @@ export default function AssessmentResultsPage() {
               totalMarks,
 
               percentage:
-
                 Math.round(
                   percentage *
-                    100
+                    100,
                 ) / 100,
 
               startedAt:
-                item.startedAt ??
-                item.startTime ??
+                item?.startedAt ??
+                item?.startTime ??
                 null,
 
               submittedAt:
-                item.submittedAt ??
-                item.completedAt ??
-                item.endTime ??
+                item?.submittedAt ??
+                item?.completedAt ??
+                item?.endTime ??
                 null,
 
               timeTakenSeconds:
-                item.timeTakenSeconds ??
-                item.durationSeconds ??
+                item?.timeTakenSeconds ??
+                item?.durationSeconds ??
                 null,
-
             };
-
-          }
+          },
         );
 
-
       setResults(
-        normalizedResults
+        normalizedResults,
       );
-
-    }
-
-    catch (
-      error: any
-    ) {
-
+    } catch (error) {
       console.error(
-        "ASSESSMENT RESULTS ERROR",
-        error
+        "ASSESSMENT RESULTS ERROR:",
+        error,
       );
 
-      setError(
-        error?.message ||
-        "Unable to load assessment results."
-      );
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to load assessment results.";
 
-    }
-
-    finally {
-
+      if (
+        message ===
+        "Failed to fetch"
+      ) {
+        setError(
+          `Unable to connect to the assessment API at ${API_URL}.\n\nMake sure the NestJS API is running and CORS is enabled.`,
+        );
+      } else {
+        setError(
+          message,
+        );
+      }
+    } finally {
       setLoading(false);
-
     }
-
   }
 
-
-  /*
-  =====================================================
-  FILTER RESULTS
-  =====================================================
-  */
+  /* ============================================================
+     FILTER RESULTS
+     ============================================================ */
 
   const filteredResults =
     useMemo(() => {
-
       const searchValue =
         search
           .trim()
           .toLowerCase();
 
-
       return results.filter(
         (result) => {
-
           const matchesSearch =
             !searchValue ||
             result.learnerName
               .toLowerCase()
               .includes(
-                searchValue
+                searchValue,
               ) ||
             result.email
               .toLowerCase()
               .includes(
-                searchValue
+                searchValue,
+              ) ||
+            result.attemptId
+              .toLowerCase()
+              .includes(
+                searchValue,
               );
-
 
           const matchesStatus =
             statusFilter ===
@@ -460,27 +526,21 @@ export default function AssessmentResultsPage() {
             result.status ===
               statusFilter;
 
-
           return (
             matchesSearch &&
             matchesStatus
           );
-
-        }
+        },
       );
-
     }, [
       results,
       search,
       statusFilter,
     ]);
 
-
-  /*
-  =====================================================
-  SUMMARY
-  =====================================================
-  */
+  /* ============================================================
+     SUMMARY
+     ============================================================ */
 
   const attendedCount =
     results.filter(
@@ -490,162 +550,169 @@ export default function AssessmentResultsPage() {
         result.status ===
           "COMPLETED" ||
         result.status ===
-          "EVALUATED"
+          "EVALUATED",
     ).length;
-
 
   const submittedCount =
     results.filter(
       (result) =>
         result.status ===
-          "SUBMITTED"
+        "SUBMITTED",
     ).length;
 
+  const evaluatedCount =
+    results.filter(
+      (result) =>
+        result.status ===
+        "EVALUATED",
+    ).length;
 
   const averagePercentage =
     results.length > 0
       ? results.reduce(
           (
             total,
-            result
+            result,
           ) =>
             total +
             result.percentage,
-          0
-        ) /
-        results.length
+          0,
+        ) / results.length
       : 0;
-
 
   const highestScore =
     results.length > 0
       ? Math.max(
           ...results.map(
             (result) =>
-              result.score
-          )
+              result.score,
+          ),
         )
       : 0;
 
-
-  /*
-  =====================================================
-  FORMAT DATE
-  =====================================================
-  */
+  /* ============================================================
+     FORMAT DATE
+     ============================================================ */
 
   function formatDate(
-    value?: string | null
+    value?: string | null,
   ) {
-
     if (!value) {
       return "-";
     }
 
-
     const date =
       new Date(value);
 
-
     if (
       Number.isNaN(
-        date.getTime()
+        date.getTime(),
       )
     ) {
-
       return "-";
-
     }
 
-
     return date.toLocaleString();
-
   }
 
-
-  /*
-  =====================================================
-  FORMAT TIME
-  =====================================================
-  */
+  /* ============================================================
+     FORMAT TIME
+     ============================================================ */
 
   function formatTime(
-    seconds?: number | null
+    seconds?: number | null,
   ) {
-
     if (
       seconds === null ||
       seconds === undefined
     ) {
-
       return "-";
-
     }
-
 
     const totalSeconds =
       Math.max(
         0,
-        Number(seconds)
+        Number(seconds),
       );
 
+    if (
+      !Number.isFinite(
+        totalSeconds,
+      )
+    ) {
+      return "-";
+    }
 
     const hours =
       Math.floor(
-        totalSeconds / 3600
+        totalSeconds / 3600,
       );
-
 
     const minutes =
       Math.floor(
-        (totalSeconds % 3600) /
-        60
+        (totalSeconds %
+          3600) /
+          60,
       );
 
-
     const remainingSeconds =
-      totalSeconds % 60;
-
+      Math.floor(
+        totalSeconds % 60,
+      );
 
     if (hours > 0) {
-
       return `${hours}h ${minutes}m`;
-
     }
 
-
     return `${minutes}m ${remainingSeconds}s`;
-
   }
 
-
-  /*
-  =====================================================
-  RESULT DETAILS
-  =====================================================
-  */
+  /* ============================================================
+     RESULT DETAILS
+     ============================================================ */
 
   function openResult(
-    attemptId: string
+    attemptId: string,
   ) {
-
     router.push(
-      `/assessments/${assessmentId}/results/${attemptId}`
+      `/assessments/${assessmentId}/result?attemptId=${encodeURIComponent(
+        attemptId,
+      )}&mode=admin`,
     );
-
   }
 
+  /* ============================================================
+     STATUS CLASS
+     ============================================================ */
 
-  /*
-  =====================================================
-  LOADING
-  =====================================================
-  */
+  function getStatusClass(
+    status: string,
+  ) {
+    switch (
+      status
+    ) {
+      case "SUBMITTED":
+      case "EVALUATED":
+      case "COMPLETED":
+        return "bg-green-100 text-green-700";
+
+      case "IN_PROGRESS":
+        return "bg-yellow-100 text-yellow-700";
+
+      case "FAILED":
+        return "bg-red-100 text-red-700";
+
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  }
+
+  /* ============================================================
+     LOADING
+     ============================================================ */
 
   if (loading) {
-
     return (
-
       <main
         className="
           min-h-screen
@@ -656,7 +723,6 @@ export default function AssessmentResultsPage() {
           text-[#25324b]
         "
       >
-
         <div
           className="
             rounded-3xl
@@ -666,28 +732,19 @@ export default function AssessmentResultsPage() {
             shadow-[9px_9px_18px_#c7ccd3,-9px_-9px_18px_#ffffff]
           "
         >
-
-          Loading assessment results...
-
+          Loading assessment
+          results...
         </div>
-
       </main>
-
     );
-
   }
 
-
-  /*
-  =====================================================
-  ERROR
-  =====================================================
-  */
+  /* ============================================================
+     ERROR
+     ============================================================ */
 
   if (error) {
-
     return (
-
       <main
         className="
           min-h-screen
@@ -696,19 +753,17 @@ export default function AssessmentResultsPage() {
           text-[#25324b]
         "
       >
-
         <div
           className="
             max-w-5xl
             mx-auto
           "
         >
-
           <button
             type="button"
             onClick={() =>
               router.push(
-                "/assessments"
+                "/assessments",
               )
             }
             className="
@@ -721,11 +776,9 @@ export default function AssessmentResultsPage() {
               shadow-[5px_5px_10px_#c7ccd3,-5px_-5px_10px_#ffffff]
             "
           >
-
-            ← Back to Assessments
-
+            ← Back to
+            Assessments
           </button>
-
 
           <div
             className="
@@ -736,7 +789,6 @@ export default function AssessmentResultsPage() {
               shadow-[9px_9px_18px_#c7ccd3,-9px_-9px_18px_#ffffff]
             "
           >
-
             <h1
               className="
                 text-2xl
@@ -744,36 +796,48 @@ export default function AssessmentResultsPage() {
                 text-red-600
               "
             >
-
-              Unable to Load Results
-
+              Unable to Load
+              Results
             </h1>
-
 
             <p
               className="
                 mt-4
                 text-gray-600
+                whitespace-pre-line
               "
             >
-
               {error}
-
             </p>
 
+            <button
+              type="button"
+              onClick={
+                loadResults
+              }
+              className="
+                mt-6
+                rounded-xl
+                bg-[#24579a]
+                px-6
+                py-3
+                font-bold
+                text-white
+              "
+            >
+              Try Again
+            </button>
           </div>
-
         </div>
-
       </main>
-
     );
-
   }
 
+  /* ============================================================
+     UI
+     ============================================================ */
 
   return (
-
     <main
       className="
         min-h-screen
@@ -783,7 +847,6 @@ export default function AssessmentResultsPage() {
         text-[#25324b]
       "
     >
-
       <div
         className="
           max-w-[1500px]
@@ -791,9 +854,9 @@ export default function AssessmentResultsPage() {
         "
       >
 
-        {/* =================================================
+        {/* ======================================================
             HEADER
-        ================================================= */}
+        ====================================================== */}
 
         <div
           className="
@@ -803,7 +866,6 @@ export default function AssessmentResultsPage() {
             shadow-[9px_9px_18px_#c7ccd3,-9px_-9px_18px_#ffffff]
           "
         >
-
           <div
             className="
               flex
@@ -814,14 +876,12 @@ export default function AssessmentResultsPage() {
               md:justify-between
             "
           >
-
             <div>
-
               <button
                 type="button"
                 onClick={() =>
                   router.push(
-                    "/assessments"
+                    "/assessments",
                   )
                 }
                 className="
@@ -831,11 +891,9 @@ export default function AssessmentResultsPage() {
                   text-[#24579a]
                 "
               >
-
-                ← Back to Assessments
-
+                ← Back to
+                Assessments
               </button>
-
 
               <h1
                 className="
@@ -843,12 +901,9 @@ export default function AssessmentResultsPage() {
                   font-bold
                 "
               >
-
                 {assessment?.title ||
                   "Assessment Results"}
-
               </h1>
-
 
               <p
                 className="
@@ -856,18 +911,14 @@ export default function AssessmentResultsPage() {
                   text-gray-500
                 "
               >
-
                 {assessment?.code ||
                   "-"}
 
                 {" • "}
 
                 Learner Results
-
               </p>
-
             </div>
-
 
             <button
               type="button"
@@ -884,19 +935,14 @@ export default function AssessmentResultsPage() {
                 shadow-lg
               "
             >
-
               ↻ Refresh
-
             </button>
-
           </div>
-
         </div>
 
-
-        {/* =================================================
+        {/* ======================================================
             SUMMARY
-        ================================================= */}
+        ====================================================== */}
 
         <section
           className="
@@ -908,14 +954,12 @@ export default function AssessmentResultsPage() {
             gap-5
           "
         >
-
           <SummaryCard
             title="Total Attempts"
             value={
               results.length
             }
           />
-
 
           <SummaryCard
             title="Attended"
@@ -924,31 +968,61 @@ export default function AssessmentResultsPage() {
             }
           />
 
-
           <SummaryCard
             title="Average Score"
-            value={
-              `${averagePercentage.toFixed(1)}%`
-            }
+            value={`${averagePercentage.toFixed(
+              1,
+            )}%`}
           />
-
 
           <SummaryCard
             title="Highest Score"
+            value={`${highestScore} / ${
+              assessment?.totalMarks ??
+              0
+            }`}
+          />
+        </section>
+
+        {/* ======================================================
+            ADDITIONAL SUMMARY
+        ====================================================== */}
+
+        <section
+          className="
+            mt-5
+            grid
+            grid-cols-1
+            sm:grid-cols-2
+            lg:grid-cols-3
+            gap-5
+          "
+        >
+          <SummaryCard
+            title="Submitted"
             value={
-              `${highestScore} / ${
-                assessment?.totalMarks ??
-                0
-              }`
+              submittedCount
             }
           />
 
+          <SummaryCard
+            title="Evaluated"
+            value={
+              evaluatedCount
+            }
+          />
+
+          <SummaryCard
+            title="Filtered Results"
+            value={
+              filteredResults.length
+            }
+          />
         </section>
 
-
-        {/* =================================================
+        {/* ======================================================
             SEARCH / FILTER
-        ================================================= */}
+        ====================================================== */}
 
         <section
           className="
@@ -959,7 +1033,6 @@ export default function AssessmentResultsPage() {
             shadow-[8px_8px_16px_#c7ccd3,-8px_-8px_16px_#ffffff]
           "
         >
-
           <div
             className="
               grid
@@ -968,18 +1041,15 @@ export default function AssessmentResultsPage() {
               gap-4
             "
           >
-
             <input
               type="text"
               value={search}
               onChange={(event) =>
                 setSearch(
-                  event.target.value
+                  event.target.value,
                 )
               }
-              placeholder="
-                Search learner name or email...
-              "
+              placeholder="Search learner name, email or attempt ID..."
               className="
                 rounded-xl
                 bg-[#e9eef5]
@@ -990,14 +1060,13 @@ export default function AssessmentResultsPage() {
               "
             />
 
-
             <select
               value={
                 statusFilter
               }
               onChange={(event) =>
                 setStatusFilter(
-                  event.target.value
+                  event.target.value,
                 )
               }
               className="
@@ -1009,7 +1078,6 @@ export default function AssessmentResultsPage() {
                 shadow-inner
               "
             >
-
               <option value="ALL">
                 All Status
               </option>
@@ -1030,16 +1098,16 @@ export default function AssessmentResultsPage() {
                 In Progress
               </option>
 
+              <option value="FAILED">
+                Failed
+              </option>
             </select>
-
           </div>
-
         </section>
 
-
-        {/* =================================================
+        {/* ======================================================
             RESULTS TABLE
-        ================================================= */}
+        ====================================================== */}
 
         <section
           className="
@@ -1050,30 +1118,25 @@ export default function AssessmentResultsPage() {
             shadow-[8px_8px_16px_#c7ccd3,-8px_-8px_16px_#ffffff]
           "
         >
-
           <div
             className="
               overflow-x-auto
             "
           >
-
             <table
               className="
                 w-full
-                min-w-[1200px]
+                min-w-[1250px]
                 text-sm
               "
             >
-
               <thead>
-
                 <tr
                   className="
                     border-b
                     border-gray-300
                   "
                 >
-
                   <th
                     className="
                       px-5
@@ -1083,7 +1146,6 @@ export default function AssessmentResultsPage() {
                   >
                     Learner
                   </th>
-
 
                   <th
                     className="
@@ -1095,7 +1157,6 @@ export default function AssessmentResultsPage() {
                     Email
                   </th>
 
-
                   <th
                     className="
                       px-5
@@ -1105,7 +1166,6 @@ export default function AssessmentResultsPage() {
                   >
                     Attempt
                   </th>
-
 
                   <th
                     className="
@@ -1117,7 +1177,6 @@ export default function AssessmentResultsPage() {
                     Status
                   </th>
 
-
                   <th
                     className="
                       px-5
@@ -1127,7 +1186,6 @@ export default function AssessmentResultsPage() {
                   >
                     Score
                   </th>
-
 
                   <th
                     className="
@@ -1139,7 +1197,6 @@ export default function AssessmentResultsPage() {
                     Percentage
                   </th>
 
-
                   <th
                     className="
                       px-5
@@ -1149,7 +1206,6 @@ export default function AssessmentResultsPage() {
                   >
                     Started
                   </th>
-
 
                   <th
                     className="
@@ -1161,7 +1217,6 @@ export default function AssessmentResultsPage() {
                     Submitted
                   </th>
 
-
                   <th
                     className="
                       px-5
@@ -1172,7 +1227,6 @@ export default function AssessmentResultsPage() {
                     Time Taken
                   </th>
 
-
                   <th
                     className="
                       px-5
@@ -1182,17 +1236,12 @@ export default function AssessmentResultsPage() {
                   >
                     Action
                   </th>
-
                 </tr>
-
               </thead>
 
-
               <tbody>
-
                 {filteredResults.map(
                   (result) => (
-
                     <tr
                       key={
                         result.attemptId
@@ -1200,6 +1249,7 @@ export default function AssessmentResultsPage() {
                       className="
                         border-b
                         border-gray-200
+                        hover:bg-[#e2e7ee]
                       "
                     >
 
@@ -1211,21 +1261,31 @@ export default function AssessmentResultsPage() {
                           py-5
                         "
                       >
-
                         <div
                           className="
                             font-bold
                           "
                         >
-
                           {
                             result.learnerName
                           }
-
                         </div>
 
+                        {result.learnerId && (
+                          <div
+                            className="
+                              mt-1
+                              text-xs
+                              text-gray-400
+                            "
+                          >
+                            ID:{" "}
+                            {
+                              result.learnerId
+                            }
+                          </div>
+                        )}
                       </td>
-
 
                       {/* EMAIL */}
 
@@ -1236,13 +1296,10 @@ export default function AssessmentResultsPage() {
                           text-gray-600
                         "
                       >
-
                         {
                           result.email
                         }
-
                       </td>
-
 
                       {/* ATTEMPT */}
 
@@ -1254,14 +1311,11 @@ export default function AssessmentResultsPage() {
                           font-bold
                         "
                       >
-
                         #
                         {
                           result.attemptNumber
                         }
-
                       </td>
-
 
                       {/* STATUS */}
 
@@ -1272,7 +1326,6 @@ export default function AssessmentResultsPage() {
                           text-center
                         "
                       >
-
                         <span
                           className={`
                             inline-flex
@@ -1281,30 +1334,16 @@ export default function AssessmentResultsPage() {
                             py-1
                             text-xs
                             font-bold
-                            ${
-                              result.status ===
-                                "SUBMITTED" ||
-                              result.status ===
-                                "EVALUATED" ||
-                              result.status ===
-                                "COMPLETED"
-                                ? "bg-green-100 text-green-700"
-                                : result.status ===
-                                    "IN_PROGRESS"
-                                  ? "bg-yellow-100 text-yellow-700"
-                                  : "bg-gray-100 text-gray-700"
-                            }
+                            ${getStatusClass(
+                              result.status,
+                            )}
                           `}
                         >
-
                           {
                             result.status
                           }
-
                         </span>
-
                       </td>
-
 
                       {/* SCORE */}
 
@@ -1316,7 +1355,6 @@ export default function AssessmentResultsPage() {
                           font-bold
                         "
                       >
-
                         {
                           result.score
                         }
@@ -1326,9 +1364,7 @@ export default function AssessmentResultsPage() {
                         {
                           result.totalMarks
                         }
-
                       </td>
-
 
                       {/* PERCENTAGE */}
 
@@ -1340,15 +1376,11 @@ export default function AssessmentResultsPage() {
                           font-bold
                         "
                       >
-
-                        {
-                          result.percentage.toFixed(
-                            1
-                          )
-                        }%
-
+                        {result.percentage.toFixed(
+                          1,
+                        )}
+                        %
                       </td>
-
 
                       {/* STARTED */}
 
@@ -1359,15 +1391,12 @@ export default function AssessmentResultsPage() {
                           text-gray-600
                         "
                       >
-
                         {
                           formatDate(
-                            result.startedAt
+                            result.startedAt,
                           )
                         }
-
                       </td>
-
 
                       {/* SUBMITTED */}
 
@@ -1378,15 +1407,12 @@ export default function AssessmentResultsPage() {
                           text-gray-600
                         "
                       >
-
                         {
                           formatDate(
-                            result.submittedAt
+                            result.submittedAt,
                           )
                         }
-
                       </td>
-
 
                       {/* TIME */}
 
@@ -1397,15 +1423,12 @@ export default function AssessmentResultsPage() {
                           text-center
                         "
                       >
-
                         {
                           formatTime(
-                            result.timeTakenSeconds
+                            result.timeTakenSeconds,
                           )
                         }
-
                       </td>
-
 
                       {/* ACTION */}
 
@@ -1416,12 +1439,11 @@ export default function AssessmentResultsPage() {
                           text-center
                         "
                       >
-
-                        {/* <button
+                        <button
                           type="button"
                           onClick={() =>
                             openResult(
-                              result.attemptId
+                              result.attemptId,
                             )
                           }
                           className="
@@ -1433,26 +1455,18 @@ export default function AssessmentResultsPage() {
                             text-white
                           "
                         >
-
                           View Result
-
-                        </button> */}
-
+                        </button>
                       </td>
 
                     </tr>
-
-                  )
+                  ),
                 )}
-
               </tbody>
-
             </table>
-
 
             {filteredResults.length ===
               0 && (
-
               <div
                 className="
                   p-12
@@ -1460,74 +1474,67 @@ export default function AssessmentResultsPage() {
                   text-gray-500
                 "
               >
-
                 {results.length ===
                 0
                   ? "No learner results available for this assessment."
                   : "No results match your search or filter."}
-
               </div>
-
             )}
-
           </div>
-
         </section>
 
-
-        {/* =================================================
+        {/* ======================================================
             FOOTER INFORMATION
-        ================================================= */}
+        ====================================================== */}
 
-        {/* =================================================
-    FOOTER INFORMATION
-================================================= */}
+        <div
+          className="
+            mt-6
+            text-sm
+            text-gray-500
+          "
+        >
+          Showing{" "}
+          <strong>
+            {
+              filteredResults.length
+            }
+          </strong>{" "}
+          of{" "}
+          <strong>
+            {results.length}
+          </strong>{" "}
+          attempts
 
-<div
-  className="
-    mt-6
-    text-sm
-    text-gray-500
-  "
->
-  Showing{" "}
-  <strong>
-    {filteredResults.length}
-  </strong>{" "}
-  of{" "}
-  <strong>
-    {results.length}
-  </strong>{" "}
-  attempts
+          {" • "}
 
-  {" • "}
+          Total Marks:{" "}
+          <strong>
+            {
+              assessment?.totalMarks ??
+              0
+            }
+          </strong>
 
-  Total Marks:{" "}
-  <strong>
-    {assessment?.totalMarks ?? 0}
-  </strong>
+          {" • "}
 
-  {" • "}
-
-  Duration:{" "}
-  <strong>
-    {assessment?.durationMinutes ?? 0} minutes
-  </strong>
-</div>
-
+          Duration:{" "}
+          <strong>
+            {
+              assessment?.durationMinutes ??
+              0
+            }{" "}
+            minutes
+          </strong>
+        </div>
       </div>
-
     </main>
-
   );
 }
 
-
-/*
-=========================================================
-SUMMARY CARD
-=========================================================
-*/
+/* ============================================================
+   SUMMARY CARD
+   ============================================================ */
 
 function SummaryCard({
   title,
@@ -1536,9 +1543,7 @@ function SummaryCard({
   title: string;
   value: string | number;
 }) {
-
   return (
-
     <div
       className="
         rounded-3xl
@@ -1547,7 +1552,6 @@ function SummaryCard({
         shadow-[7px_7px_14px_#c7ccd3,-7px_-7px_14px_#ffffff]
       "
     >
-
       <p
         className="
           text-sm
@@ -1555,11 +1559,8 @@ function SummaryCard({
           text-gray-500
         "
       >
-
         {title}
-
       </p>
-
 
       <p
         className="
@@ -1568,12 +1569,8 @@ function SummaryCard({
           font-bold
         "
       >
-
         {value}
-
       </p>
-
     </div>
-
   );
 }
